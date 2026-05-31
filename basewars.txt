@@ -1,0 +1,16 @@
+"basewars"
+{
+    "base"          "sandbox"
+    "title"         "BaseWars"
+    "version"       "1.0.0"
+    "maps"		    "^bw_"
+    "category"      "other"
+    "menusystem"    "1"
+
+    "author_name"   "Brov3r"
+    "author_email"  ""
+
+    "icon"  ""
+    "info"  ""
+    "hide"  "0"
+}
