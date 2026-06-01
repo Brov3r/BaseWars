@@ -43,7 +43,10 @@ end
 
 hook.Add("HUDPaint", "BW_HUD", function()
     local player = LocalPlayer()
-    if not IsValid(player) or not player:Alive() then
+    local weapon = player:GetActiveWeapon()
+    local isCamera = IsValid(weapon) and weapon:GetClass() == "gmod_camera"
+    
+    if not IsValid(player) or not player:Alive() or isCamera then
         avatar:SetVisible(false)
         return
     end
@@ -117,6 +120,38 @@ hook.Add("HUDPaint", "BW_HUD", function()
         draw.SimpleText("/ " .. tostring(math.floor(reserve)), "Inter18Thin",
             ammoX + 10, ammoY + 32,
             reserveColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    end
+end)
+
+local selector = vgui.Create("WeaponSelector")
+
+hook.Add("PlayerBindPress", "BW_WeaponSelectorTrigger", function(ply, bind, pressed)
+    if not pressed then return end
+    
+    if string.find(bind, "invprev") or string.find(bind, "invnext") then
+        if not IsValid(selector) then 
+            selector = vgui.Create("WeaponSelector") 
+        end
+        
+        selector:ShowSelector()
+        
+        if string.find(bind, "invnext") then
+            selector.Selected = math.Clamp(selector.Selected + 1, 1, #selector.Weapons)
+        else
+            selector.Selected = math.Clamp(selector.Selected - 1, 1, #selector.Weapons)
+        end
+        
+        return true
+    end
+    
+    if bind == "+attack" and selector.TargetAlpha > 0 then
+        RunConsoleCommand("use", selector.Weapons[selector.Selected]:GetClass())
+        selector.TargetAlpha = 0
+        return true
+    end
+
+    if string.find(bind, "slot") then
+        return true 
     end
 end)
 

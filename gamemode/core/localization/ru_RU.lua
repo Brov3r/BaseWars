@@ -15,6 +15,11 @@ BW.Translate = {
 		Deaths = "Смерти",
 		Ping = "Пинг",
 	},
+	SpawnMenu = {
+		PropsTabName = "Пропы",
+		ShopTabName = "Магазин",
+	},
+	WeaponSelector = "АРСЕНАЛ",
 	PayDay = "Зарплата! Вы получили $%s!",
 	ServerOnly = "Используется только на сервере!",
 }

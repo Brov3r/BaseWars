@@ -27,7 +27,7 @@ IncludeShared("config.lua")
 IncludeShared("core/localization/ru_RU.lua") -- Localization
 IncludeShared("core/utils.lua")
 IncludeShared("core/economy/database.lua")
-IncludeShared("core/ui/notify.lua")
+IncludeShared("core/notify.lua")
 IncludeShared("core/team.lua")
 
 -- CLIENT ONLY
@@ -35,9 +35,11 @@ IncludeClient("core/ui/fonts.lua")
 IncludeClient("core/ui/vgui/ui_circularavatar.lua")
 IncludeClient("core/ui/vgui/ui_hexavatar.lua")
 IncludeClient("core/ui/vgui/ui_scoreboard.lua")
+IncludeClient("core/ui/vgui/ui_weapon_selector.lua")
 IncludeClient("core/ui/hud.lua")
 IncludeClient("core/ui/scoreboard.lua")
 IncludeClient("core/ui/nametags.lua")
+IncludeClient("core/spawnmenu.lua")
 
 -- SERVER ONLY
 IncludeServer("core/economy/payday.lua")
