@@ -6,6 +6,7 @@ local STATS = {
 }
 
 local PLAYER = FindMetaTable("Player")
+local serverOnly = string.lower(BW.Translate.ServerOnly) or "is Server-only!"
 
 for key, data in pairs(STATS) do
     local nwType = data.type or "Int"
@@ -41,14 +42,14 @@ for key, data in pairs(STATS) do
         end
     else
         PLAYER["Set" .. key] = function(self, value)
-            if BW.Log then BW.Log("error", "[Client] Set" .. key .. " is Server Only!") end
+            if BW.Log then BW.Log("error", "[Client] Set" .. key, serverOnly) end
         end
         if nwType == "Int" or nwType == "Float" then
             PLAYER["Add" .. key] = function(self, amount)
-                if BW.Log then BW.Log("error", "[Client] Add" .. key .. " is Server Only!") end
+                if BW.Log then BW.Log("error", "[Client] Add" .. key, serverOnly) end
             end
             PLAYER["Take" .. key] = function(self, amount)
-                if BW.Log then BW.Log("error", "[Client] Take" .. key .. " is Server Only!") end
+                if BW.Log then BW.Log("error", "[Client] Take" .. key, serverOnly) end
             end
             PLAYER["Has" .. key] = function(self, amount)
                 return self["Get" .. key](self) >= (tonumber(amount) or 0)

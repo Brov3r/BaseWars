@@ -32,8 +32,9 @@ IncludeShared("core/team.lua")
 
 -- CLIENT ONLY
 IncludeClient("core/ui/fonts.lua")
-IncludeClient("core/ui/vgui/CircularAvatar.lua")
-IncludeClient("core/ui/vgui/HexAvatar.lua")
+IncludeClient("core/ui/vgui/ui_circularavatar.lua")
+IncludeClient("core/ui/vgui/ui_hexavatar.lua")
+IncludeClient("core/ui/vgui/ui_scoreboard.lua")
 IncludeClient("core/ui/hud.lua")
 IncludeClient("core/ui/scoreboard.lua")
 IncludeClient("core/ui/nametags.lua")

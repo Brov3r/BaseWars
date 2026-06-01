@@ -84,6 +84,16 @@ function BW.Utils.StringMoney(amount)
     return sign .. formatted
 end
 
+function BW.Utils.TruncateText(text, font, maxWidth)
+    if not maxWidth or maxWidth <= 0 then return text end
+    surface.SetFont(font)
+    if surface.GetTextSize(text) <= maxWidth then return text end
+    while #text > 1 and surface.GetTextSize(text .. "...") > maxWidth do
+        text = string.sub(text, 1, -2)
+    end
+    return text .. "..."
+end
+
 function BW.Utils.DrawShadowedText(text, font, x, y, color, shadowColor, offsetX, offsetY)
     offsetX = offsetX or 2
     offsetY = offsetY or 2
