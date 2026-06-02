@@ -11,7 +11,35 @@ function PANEL:Init()
 end
 
 function PANEL:UpdateWeapons()
-    self.Weapons = LocalPlayer():GetWeapons()
+    local allWeapons = LocalPlayer():GetWeapons()
+    local sortedWeapons = {}
+
+    -- Собираем всё валидное оружие в новую таблицу
+    for _, wep in ipairs(allWeapons) do
+        if IsValid(wep) then
+            table.insert(sortedWeapons, wep)
+        end
+    end
+
+    -- Сортируем список
+    table.sort(sortedWeapons, function(a, b)
+        local classA = a:GetClass()
+        local classB = b:GetClass()
+
+        if classA == "weapon_physgun" then return true end
+        if classB == "weapon_physgun" then return false end
+
+        local slotA = a:GetSlot() or 0
+        local slotB = b:GetSlot() or 0
+        
+        if slotA == slotB then
+            return classA < classB
+        end
+        
+        return slotA < slotB
+    end)
+
+    self.Weapons = sortedWeapons
 end
 
 local WepSelectIcon = Material("icon16/gun.png", "smooth")
@@ -46,7 +74,7 @@ function PANEL:Paint(w, h)
     
     local weaponNames = {}
     for i, wep in ipairs(self.Weapons) do
-       	local rawName = language.GetPhrase(wep:GetPrintName() or "Unknown")
+       	local rawName = BW.Translate.Weapon[wep:GetClass()] or language.GetPhrase(wep:GetPrintName() or "Unknown")
     	local name = ToUpperUTF8(rawName)
         weaponNames[i] = name
         local nameW = surface.GetTextSize(name)

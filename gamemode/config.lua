@@ -66,17 +66,24 @@ BW.Config = {
         },
         Margin             = 10,
         AvatarCornerOffset = 20,
+        AnimTime          = 0.2,
     },
-	AnimTime          = 0.2,
+    PlayerGroup = {
+        ["admin"] = {
+                PayDayMultiplier = 2.5,
+        },
+        ["vip"] = {
+                PayDayMultiplier = 2.0,
+        },
+        ["user"] = {
+                PayDayMultiplier = 1.0,
+        },
+    },
     StartMoney        = 5000,
+    Currency          = "$",
     PayDayInterval    = 300,
     PayDayDefaultMin  = 500,
     PayDayDefaultMax  = 800,
-    PayDayMultiplier  = {
-        ["admin"] = 2.5,
-        ["vip"]   = 1.7,
-        ["user"]  = 1,
-    }
 }
 
 -- Export

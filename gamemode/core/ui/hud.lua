@@ -14,6 +14,7 @@ local HiddenElementsLookup = {
     ["CHudBattery"] = true,
     ["CHudAmmo"]    = true,
     ["CHudSecondaryAmmo"] = true,
+    ["CHudWeaponSelection"] = true,
 }
 
 local function GetReserveAmmo(ply)
@@ -83,7 +84,7 @@ hook.Add("HUDPaint", "BW_HUD", function()
     -- Money
     local smoothMoney = BW.Utils.SmoothValue("money", player:GetMoney(), animTime)
     local moneyString = BW.Utils.StringMoney(math.floor(smoothMoney))
-    BW.Utils.DrawShadowedText("$" .. moneyString, "Inter24", barX,
+    BW.Utils.DrawShadowedText(BW.Config.Currency .. moneyString, "Inter24", barX,
         sh - margin - dim.Avatar, colors.White, colors.Black, 2, 2)
 
     -- Ammo
@@ -127,31 +128,81 @@ local selector = vgui.Create("WeaponSelector")
 
 hook.Add("PlayerBindPress", "BW_WeaponSelectorTrigger", function(ply, bind, pressed)
     if not pressed then return end
-    
+
+    local isAttacking = ply:KeyDown(IN_ATTACK)
+
+    local isSelectorOpen = IsValid(selector) and (selector.TargetAlpha or 0) > 0
+
+    local function PerformSelection()
+        if not IsValid(selector) or not selector.Weapons then return end
+        local wep = selector.Weapons[selector.Selected]
+        if IsValid(wep) then
+            surface.PlaySound("items/gunpickup2.wav")
+            RunConsoleCommand("use", wep:GetClass())
+        end
+        selector.TargetAlpha = 0
+    end
+
     if string.find(bind, "invprev") or string.find(bind, "invnext") then
+        if isAttacking then return end 
+
         if not IsValid(selector) then 
-            selector = vgui.Create("WeaponSelector") 
+            selector = vgui.Create("WeaponSelector")
         end
         
         selector:ShowSelector()
         
+        local oldSelected = selector.Selected or 1
+        
         if string.find(bind, "invnext") then
-            selector.Selected = math.Clamp(selector.Selected + 1, 1, #selector.Weapons)
+            selector.Selected = math.Clamp(oldSelected + 1, 1, #selector.Weapons)
         else
-            selector.Selected = math.Clamp(selector.Selected - 1, 1, #selector.Weapons)
+            selector.Selected = math.Clamp(oldSelected - 1, 1, #selector.Weapons)
+        end
+        
+        if selector.Selected ~= oldSelected then
+            surface.PlaySound("buttons/button15.wav") 
         end
         
         return true
     end
-    
-    if bind == "+attack" and selector.TargetAlpha > 0 then
-        RunConsoleCommand("use", selector.Weapons[selector.Selected]:GetClass())
-        selector.TargetAlpha = 0
-        return true
+
+    if bind == "+attack" then
+        if isSelectorOpen then
+            PerformSelection()
+            return true
+        end
     end
 
-    if string.find(bind, "slot") then
-        return true 
+    local slotNum = tonumber(string.match(bind, "slot(%d+)"))
+    if slotNum then
+        if not IsValid(selector) then 
+            selector = vgui.Create("WeaponSelector")
+        end
+
+        local targetIndex = (slotNum == 0) and 10 or slotNum
+        
+        if selector.Weapons and targetIndex >= 1 and targetIndex <= #selector.Weapons then
+            selector:ShowSelector()
+            
+            local oldSelected = selector.Selected or 1
+            selector.Selected = targetIndex
+            
+            if selector.Selected ~= oldSelected then
+                surface.PlaySound("buttons/button15.wav")
+            end
+
+            return true
+        else
+            if isSelectorOpen then
+                selector.TargetAlpha = 0
+            end
+            return true
+        end
+    end
+
+    if string.find(bind, "slot") and isSelectorOpen then
+        return true
     end
 end)
 

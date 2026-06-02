@@ -1,6 +1,14 @@
 local function GetPayDayMultiplier(ply)
     if not IsValid(ply) then return 1 end
-    return BW.Config.PayDayMultiplier[ply:GetUserGroup()] or 1
+    
+    local userGroup = ply:GetUserGroup()
+    local groupConfig = BW.Config.PlayerGroup[userGroup]
+    
+    if groupConfig and groupConfig.PayDayMultiplier then
+        return groupConfig.PayDayMultiplier
+    end
+    
+    return 1
 end
 
 local function GivePayDay(ply)

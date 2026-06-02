@@ -15,6 +15,9 @@ BW.Translate = {
 		Deaths = "Смерти",
 		Ping = "Пинг",
 	},
+	Weapon = {
+		["weapon_physgun"] = "Физическая пушка",
+	},
 	SpawnMenu = {
 		PropsTabName = "Пропы",
 		ShopTabName = "Магазин",
