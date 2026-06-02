@@ -22,19 +22,19 @@ local function CreateScoreboard()
     scoreboardPanel:AddColumn({
         id = "kills", header = BW.Translate.Scoreboard.Kills or  "Kills", icon = "icon16/star.png", 
         width = 110, align = TEXT_ALIGN_CENTER,
-        getter = function(ply) return ply:GetKills() or 0 end
+        getter = function(ply) return BW.Utils.StringNumber(ply:GetKills()) or 0 end
     })
 
     scoreboardPanel:AddColumn({
         id = "deaths", header = BW.Translate.Scoreboard.Deaths or "Deaths", icon = "icon16/cross.png", 
         width = 90, align = TEXT_ALIGN_CENTER,
-        getter = function(ply) return ply:GetDeaths() or 0 end
+        getter = function(ply) return BW.Utils.StringNumber(ply:GetDeaths()) or 0 end
     })
 
     scoreboardPanel:AddColumn({
         id = "ping", header = BW.Translate.Scoreboard.Ping or "Ping", icon = "icon16/connect.png", 
         width = 110, align = TEXT_ALIGN_CENTER,
-        getter = function(ply) return ply:Ping() or 0 end
+        getter = function(ply) return BW.Utils.StringNumber(ply:Ping()) or 0 end
     })
 
     scoreboardPanel:Build()

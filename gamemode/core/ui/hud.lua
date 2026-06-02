@@ -83,7 +83,7 @@ hook.Add("HUDPaint", "BW_HUD", function()
 
     -- Money
     local smoothMoney = BW.Utils.SmoothValue("money", player:GetMoney(), animTime)
-    local moneyString = BW.Utils.StringMoney(math.floor(smoothMoney))
+    local moneyString = BW.Utils.StringNumber(math.floor(smoothMoney))
     BW.Utils.DrawShadowedText(BW.Config.Currency .. moneyString, "Inter24", barX,
         sh - margin - dim.Avatar, colors.White, colors.Black, 2, 2)
 

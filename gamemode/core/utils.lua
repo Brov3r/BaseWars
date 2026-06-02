@@ -66,7 +66,7 @@ function BW.Utils.SmoothValue(stateKey, value, animTime)
     return Lerp(progress, state.from, state.to)
 end
 
-function BW.Utils.StringMoney(amount)
+function BW.Utils.StringNumber(amount)
     amount = tonumber(amount) or 0
     
     local sign = ""

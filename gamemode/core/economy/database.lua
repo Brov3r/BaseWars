@@ -20,16 +20,20 @@ for key, data in pairs(STATS) do
 
     if SERVER then
         PLAYER["Set" .. key] = function(self, value)
+            local oldValue = self["Get" .. key] and self["Get" .. key](self) or 0
+            
             self[setFunc](self, key, value)
             self:MarkStatDirty(key)
+            
+            BW.Log("info", "[DB]", string.format("%s | Set %s: %s -> %s", self:Nick(), key, oldValue, value))
         end
-
+                
         if nwType == "Int" or nwType == "Float" then
             PLAYER["Add" .. key] = function(self, amount)
                 amount = math.Max(tonumber(amount) or 0, 0)
                 self["Set" .. key](self, self["Get" .. key](self) + amount)
             end
-
+            
             PLAYER["Take" .. key] = function(self, amount)
                 amount = math.Max(tonumber(amount) or 0, 0) 
                 local current = self["Get" .. key](self)
