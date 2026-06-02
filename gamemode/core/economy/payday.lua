@@ -21,7 +21,7 @@ local function GivePayDay(ply)
     ply:AddMoney(finalPay)
 
     local translateText = BW.Translate.PayDay or "Salary! You have received $%s!"
-    local text = string.format(translateText, BW.Utils.StringMoney(finalPay))
+    local text = string.format(translateText, BW.Utils.StringNumber(finalPay))
     ply:Notify(NOTIFY_SUCCESS, text, 5)
 end
 
