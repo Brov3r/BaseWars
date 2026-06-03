@@ -19,12 +19,13 @@ BW.Translate = {
 	},
 	Weapon = {
 		["weapon_physgun"] = "Физическая пушка",
+		["weapon_physcannon"] = "Гравитационная пушка",
 	},
 	SpawnMenu = {
 		PropsTabName = "Пропы",
 		ShopTabName = "Магазин",
 	},
 	WeaponSelector = "АРСЕНАЛ",
-	PayDay = "Зарплата! Вы получили $%s!",
+	PayDay = "Зарплата! Вы получили " .. BW.Config.Currency .. "%s!",
 	ServerOnly = "Используется только на сервере!",
 }

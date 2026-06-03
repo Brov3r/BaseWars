@@ -142,6 +142,12 @@ BW.Config = {
         ["material"] = true,
         ["remover"] = true
     },
+    PlayerLoadout = {
+        "weapon_physcannon",
+        "gmod_tool",
+        "weapon_physgun",
+        "gmod_camera"
+    },
     PlayerGroup = {
         ["admin"] = {
             PayDayMultiplier = 2.5,
