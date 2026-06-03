@@ -15,6 +15,8 @@ BW.Translate = {
 		Deaths = "Смерти",
 		Ping = "Пинг",
 	},
+	Tools = {
+	},
 	Weapon = {
 		["weapon_physgun"] = "Физическая пушка",
 	},

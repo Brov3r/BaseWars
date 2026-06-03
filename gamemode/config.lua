@@ -133,14 +133,13 @@ BW.Config = {
         "models/mechanics/solid_steel/sheetmetal_box90_4.mdl",
     },
     AllowedTools = {
+        ["weld"] = true,
         ["button"] = true,
         ["lamp"] = true,
-        ["nocollide"] = true,
         ["nocollide"] = true,
         ["camera"] = true,
         ["colour"] = true,
         ["material"] = true,
-        ["weld"] = true,
         ["remover"] = true
     },
     PlayerGroup = {

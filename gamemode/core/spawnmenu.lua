@@ -1,24 +1,33 @@
 local oldGetTools = spawnmenu.GetTools
 
--- hook.Add("InitPostEntity", "BW_ForceOverrideActivateTool", function()
---     local oldActivateTool = spawnmenu.ActivateTool
+cvars.AddChangeCallback("gmod_toolmode", function(convar_name, old_value, new_value)
+        if not BW or not BW.Config or not BW.Config.AllowedTools then return end
 
---     spawnmenu.ActivateTool = function(tool, menu_only)
---         -- Если это уже наша функция, просто пропускаем
---         -- (проверка на уникальный признак, например, наличие переменной)
+        local ply = LocalPlayer()
+        if not IsValid(ply) then return end
         
---         local isAllowed = (BW and BW.Config and BW.Config.AllowedTools[tool])
+        if new_value == "" then return end
 
---         if not isAllowed then
---             print("[BW_DEBUG] Блокировка активации: " .. tostring(tool))
---             -- Переключаем на сварку
---             oldActivateTool("weld", menu_only)
---             return
---         end
+        local isAllowed = BW.Config.AllowedTools[string.lower(new_value)]
 
---         oldActivateTool(tool, menu_only)
---     end
--- end)
+        if not isAllowed then
+            local toolWeapon = weapons.Get("gmod_tool")
+            local firstTool = "physgun"
+
+            if toolWeapon and toolWeapon.Tool then
+                local toolList = table.GetKeys(toolWeapon.Tool)
+                table.sort(toolList)
+
+                for _, toolName in ipairs(toolList) do
+                    if BW.Config.AllowedTools[string.lower(toolName)] then
+                        firstTool = toolName
+                        break
+                    end
+                end
+            end
+            RunConsoleCommand("gmod_toolmode", firstTool)
+        end
+    end, "BW_ToolRestriction")
 
 spawnmenu.GetTools = function()
     local tools = oldGetTools()
@@ -32,7 +41,7 @@ spawnmenu.GetTools = function()
                 for key, item in pairs(category) do
                     if type(key) == "number" and istable(item) then
                         local itemName = item.ItemName or "NO_NAME"
-                        local isAllowed = (BW and BW.Config and BW.Config.AllowedTools[itemName])
+                        local isAllowed = (BW and BW.Config and BW.Config.AllowedTools[string.lower(itemName)])
                         
                         if not isAllowed then
                             category[key] = nil
