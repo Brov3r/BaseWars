@@ -9,17 +9,29 @@ end
 local PANEL = {}
 
 function PANEL:Init()
-    self.AvatarSize = BW.Config.Scoreboard.AvatarSize
-    self.AvatarOffsetX = BW.Config.Scoreboard.AvatarOffsetX
-    self.MuteBtnWidth = BW.Config.Scoreboard.MuteBtnWidth
-    self.MuteBtnMargin = BW.Config.Scoreboard.MuteBtnMargin
-    self.PanelWidth = BW.Config.Scoreboard.PanelWidth
-    self.PanelMaxHeight = BW.Config.Scoreboard.PanelMaxHeight
-    self.HeaderHeight = BW.Config.Scoreboard.HeaderHeight
-    self.RowHeight = BW.Config.Scoreboard.RowHeight
-    self.LeftMargin = BW.Config.Scoreboard.LeftMargin
-    self.Spacing = BW.Config.Scoreboard.Spacing
-    self.Colors = Colors
+    -- Безопасное получение конфига с фоллбэками
+    local cfg = BW.Config or {}
+    local sbCfg = cfg.Scoreboard or {}
+    local colors = cfg.Colors or {}
+
+    self.AvatarSize = sbCfg.AvatarSize or 32
+    self.AvatarOffsetX = sbCfg.AvatarOffsetX or 50
+    self.MuteBtnWidth = sbCfg.MuteBtnWidth or 24
+    self.MuteBtnMargin = sbCfg.MuteBtnMargin or 10
+    self.PanelWidth = sbCfg.PanelWidth or 800
+    self.PanelMaxHeight = sbCfg.PanelMaxHeight or 600
+    self.HeaderHeight = sbCfg.HeaderHeight or 40
+    self.RowHeight = sbCfg.RowHeight or 40
+    self.LeftMargin = sbCfg.LeftMargin or 20
+    self.Spacing = sbCfg.Spacing or 2
+
+    -- Безопасные цвета: если в конфиге их нет, используем стандартные
+    self.Colors = {
+        White      = colors.White or Color(255, 255, 255, 255),
+        DarkGray   = colors.DarkGray or Color(60, 60, 60, 255),
+        DarkGray35 = colors.DarkGray35 or Color(35, 35, 40, 245),
+        DarkGray45 = colors.DarkGray45 or Color(45, 45, 50, 245),
+    }
 
     self.Columns = {}
     self.Rows = {}
@@ -201,7 +213,7 @@ function PANEL:RefreshRows()
                         x = left + col.width - 5
                     end
 
-                    local textColor = s["col_color_" .. col.id] or col.color
+                    local textColor = s["col_color_" .. col.id] or col.color or self.Colors.White
                     draw.SimpleText(displayValue, "Inter16Thin", x, y, textColor, col.align, TEXT_ALIGN_CENTER)
                 end
             end

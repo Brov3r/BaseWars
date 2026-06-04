@@ -1,62 +1,63 @@
-BW.Config = BW.Config or {}
-
 BW.Config = {
-    Motion = {
+	Colors = {
+		-- === Base ===
+		White  = Color(255, 255, 255, 255),
+		Black  = Color(0, 0, 0, 255),
+		
+		Red    = Color(244, 67, 54, 255),
+		Pink   = Color(233, 30, 99, 255),
+		Purple = Color(156, 39, 176, 255),
+		Blue   = Color(33, 150, 243, 255),
+		Cyan   = Color(0, 188, 212, 255),
+		Teal   = Color(0, 150, 136, 255),
+		Green  = Color(76, 175, 80, 255),
+		Yellow = Color(255, 235, 59, 255),
+		Orange = Color(255, 152, 0, 255),
+		Amber  = Color(255, 193, 7, 255),
+		Brown  = Color(121, 85, 72, 255),
+		Grey   = Color(158, 158, 158, 255),
+
+		-- === Gray ===
+		Gray10        = Color(10, 10, 10, 255),
+		Gray20        = Color(20, 20, 20, 255),
+		DarkGray30    = Color(30, 30, 30, 255),
+		DarkGray35    = Color(35, 35, 40, 245),
+		Gray40        = Color(40, 40, 40, 255),
+		DarkGray45    = Color(45, 45, 50, 245),
+		Gray50        = Color(50, 50, 50, 255),
+		DarkGray      = Color(60, 60, 60, 255),
+		Gray80        = Color(80, 80, 80, 255),
+		Gray100       = Color(100, 100, 100, 255),
+		Gray128       = Color(128, 128, 128, 255),
+		Gray150       = Color(150, 150, 150, 255),
+		Silver        = Color(192, 192, 192, 255),
+		LightGray     = Color(200, 200, 200, 255),
+		Gray220       = Color(220, 220, 220, 255),
+		Gray240       = Color(240, 240, 240, 255),
+
+		-- === Status ===
+		Info      = Color(100, 180, 255, 255),
+		Warn      = Color(255, 200, 50, 255),
+		Error     = Color(255, 100, 100, 255),
+		Success   = Color(100, 255, 100, 255),
+	},
+	Motion = {
         WalkSpeed   = 125,
         RunSpeed    = 250,
         JumpPower   = 200
+    },
+	NameTag = {
+        MaxDist   = 800,
+        FadeDist  = 50,
+        FadeSpeed = 12,
+        Scale     = 0.18,
     },
 	Notify = {
 		MaxNotification 	= 5,
 		Spacing 			= 10,
 		SlideSpeed 			= 8,
 	},
-    Colors = {
-        White         = Color(255, 255, 255),
-        Black         = Color(0, 0, 0),
-        Red           = Color(255, 50, 50),
-        Green         = Color(0, 255, 0),
-        Blue          = Color(0, 0, 255),
-        Gray          = Color(128, 128, 128),
-        LightGray     = Color(200, 200, 200),
-        DarkGray      = Color(60, 60, 60),
-        DarkGray45    = Color(45, 45, 50, 245),
-        DarkGray35    = Color(35, 35, 40, 245),
-        DarkGray30    = Color(30, 30, 30),
-        BlackAlpha50  = Color(0, 0, 0, 128),
-        BlackAlpha150 = Color(0, 0, 0, 150),
-        BlackAlpha200 = Color(0, 0, 0, 200),
-        WhiteAlpha200 = Color(255, 255, 255, 200),
-        Info          = Color(100, 180, 255),
-        Warn          = Color(255, 200, 50),
-        Error         = Color(255, 100, 100),
-        Success       = Color(100, 255, 100),
-        Silver        = Color(192, 192, 192),
-        Gold          = Color(255, 215, 0),
-        Orange        = Color(255, 165, 0),
-        Purple        = Color(128, 0, 128),
-        Cyan          = Color(0, 255, 255),
-        Yellow        = Color(255, 255, 0),
-    },
-    Scoreboard = {
-        Spacing        = 2,
-        AvatarSize     = 32,
-        AvatarOffsetX  = 42,
-        MuteBtnWidth   = 24,
-        MuteBtnMargin  = 20,
-        PanelWidth     = 840,
-        PanelMaxHeight = 600,
-        HeaderHeight   = 30,
-        RowHeight      = 48,
-        LeftMargin     = 20,
-    },
-    NameTag = {
-        MaxDist   = 800,
-        FadeDist  = 50,
-        FadeSpeed = 12,
-        Scale     = 0.18,
-    },
-    HUD = {
+	HUD = {
         Dimensions = {
             Avatar       = 78,
             HealthBarH   = 15,
@@ -68,7 +69,7 @@ BW.Config = {
         AvatarCornerOffset = 20,
         AnimTime          = 0.2,
     },
-    Props = {
+	Props = {
         "models/props_borealis/mooring_cleat01.mdl",
         "models/props_borealis/borealis_door001a.mdl",
         "models/props_borealis/bluebarrel001.mdl",
@@ -142,13 +143,13 @@ BW.Config = {
         ["material"] = true,
         ["remover"] = true
     },
-    PlayerLoadout = {
+	PlayerLoadout = {
         "weapon_physcannon",
         "gmod_tool",
         "weapon_physgun",
         "gmod_camera"
     },
-    PlayerGroup = {
+	PlayerGroups = {
         ["admin"] = {
             PayDayMultiplier = 2.5,
         },
@@ -159,12 +160,9 @@ BW.Config = {
             PayDayMultiplier = 1.0,
         },
     },
-    StartMoney        = 5000,
     Currency          = "$",
+    StartMoney        = 5000,
     PayDayInterval    = 300,
     PayDayDefaultMin  = 500,
     PayDayDefaultMax  = 800,
 }
-
--- Export
-Colors = BW.Config.Colors

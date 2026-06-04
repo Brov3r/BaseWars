@@ -1,8 +1,8 @@
 local PANEL = {}
 
 function PANEL:Init()
-    self:SetSize(400, 60)
-    self:SetPos(ScrW() / 2 - 200, 20)
+    self:SetSize(500, 65)
+    self:SetPos(ScrW() / 2 - 250, 30)
     self.Weapons = {}
     self.Selected = 1
     self.TargetAlpha = 0
@@ -11,17 +11,18 @@ function PANEL:Init()
 end
 
 function PANEL:UpdateWeapons()
-    local allWeapons = LocalPlayer():GetWeapons()
+    local ply = LocalPlayer()
+    if not IsValid(ply) then return end
+    
+    local allWeapons = ply:GetWeapons()
     local sortedWeapons = {}
 
-    -- Собираем всё валидное оружие в новую таблицу
     for _, wep in ipairs(allWeapons) do
         if IsValid(wep) then
             table.insert(sortedWeapons, wep)
         end
     end
 
-    -- Сортируем список
     table.sort(sortedWeapons, function(a, b)
         local classA = a:GetClass()
         local classB = b:GetClass()
@@ -42,8 +43,6 @@ function PANEL:UpdateWeapons()
     self.Weapons = sortedWeapons
 end
 
-local WepSelectIcon = Material("icon16/gun.png", "smooth")
-
 local function ToUpperUTF8(str)
     local res = ""
     for _, cp in utf8.codes(str) do
@@ -62,9 +61,16 @@ function PANEL:Paint(w, h)
     if self.CurrentAlpha < 1 then return end
     local alpha = self.CurrentAlpha / 255
 
-    draw.RoundedBox(8, 0, 0, w, h, Color(30, 30, 30, 240 * alpha))
+    local c = BW.Config.Colors
+
+    local bgColor = Color(c.DarkGray35.r, c.DarkGray35.g, c.DarkGray35.b, 240 * alpha)
+    draw.RoundedBox(8, 0, 0, w, h, bgColor)
     
-    draw.SimpleText(BW.Translate.WeaponSelector, "Inter14", w / 2, 13, Color(255, 255, 255, 200 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+    draw.RoundedBoxEx(8, 0, 0, w, 1, Color(c.Gray50.r, c.Gray50.g, c.Gray50.b, 150 * alpha), true, true, false, false)
+
+    local title = (BW.Translate and BW.Translate.WeaponSelector) or "WEAPONS"
+    local count = #self.Weapons
+    draw.SimpleText(title .. "  •  " .. count, "Inter12", w / 2, 10, Color(c.White.r, c.White.g, c.White.b, 200 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
 
     surface.SetFont("Inter16")
     
@@ -74,8 +80,8 @@ function PANEL:Paint(w, h)
     
     local weaponNames = {}
     for i, wep in ipairs(self.Weapons) do
-       	local rawName = BW.Translate.Weapon[wep:GetClass()] or language.GetPhrase(wep:GetPrintName() or "Unknown")
-    	local name = ToUpperUTF8(rawName)
+        local rawName = (BW.Translate and BW.Translate.Weapon and BW.Translate.Weapon[wep:GetClass()]) or language.GetPhrase(wep:GetPrintName() or "Unknown")
+        local name = ToUpperUTF8(rawName)
         weaponNames[i] = name
         local nameW = surface.GetTextSize(name)
         
@@ -83,44 +89,56 @@ function PANEL:Paint(w, h)
             selectedX = fullListWidth 
             selectedW = nameW
         end
-        fullListWidth = fullListWidth + nameW + (i < #self.Weapons and 30 or 0)
+        fullListWidth = fullListWidth + nameW + (i < #self.Weapons and 25 or 0)
     end
 
     local targetOffset = 0
-    if fullListWidth < (w - 40) then
+    if fullListWidth < (w - 60) then
         targetOffset = (w - fullListWidth) / 2
     else
-        local idealOffset = 200 - selectedX - (selectedW / 2)
-        targetOffset = math.Clamp(idealOffset, (w - 20) - fullListWidth, 20)
+        local idealOffset = (w / 2) - selectedX - (selectedW / 2)
+        targetOffset = math.Clamp(idealOffset, (w - 30) - fullListWidth, 30)
     end
 
-    self.ScrollOffset = Lerp(FrameTime() * 10, self.ScrollOffset, targetOffset)
+    self.ScrollOffset = Lerp(FrameTime() * 12, self.ScrollOffset, targetOffset)
+
+    local cyanPill = Color(c.Cyan.r, c.Cyan.g, c.Cyan.b, 40 * alpha)
+    local cyanText = Color(c.Cyan.r, c.Cyan.g, c.Cyan.b, 255 * alpha)
+    local whiteText = Color(c.White.r, c.White.g, c.White.b, 255 * alpha)
+    local grayText  = Color(c.Gray100.r, c.Gray100.g, c.Gray100.b, 255 * alpha)
 
     local x = self.ScrollOffset
+    local centerY = (h / 2) + 5
+
     for i, wep in ipairs(self.Weapons) do
         local name = weaponNames[i]
         local textW = surface.GetTextSize(name)
         local isSelected = (self.Selected == i)
         
-        local textColor = isSelected and Color(Colors.Cyan.r, Colors.Cyan.g, Colors.Cyan.b, 255 * alpha) 
-                                      or Color(150, 150, 150, 255 * alpha)
-        
-        if x > -textW and x < w then
-            draw.SimpleText(name, "Inter16", x, 40, textColor, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            
+        if x > -textW - 20 and x < w + 20 then
             if isSelected then
-                draw.RoundedBox(0, x, 52, textW, 2, Color(Colors.Cyan.r, Colors.Cyan.g, Colors.Cyan.b, 255 * alpha))
+                local pillW = textW + 20
+                local pillH = 26
+                local pillX = x - 10
+                local pillY = centerY - (pillH / 2)
+                
+                draw.RoundedBox(13, pillX, pillY, pillW, pillH, cyanPill)
+                draw.SimpleText(name, "Inter16", x, centerY, whiteText, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+            else
+                draw.SimpleText(name, "Inter16", x, centerY, grayText, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             end
         end
         
-        x = x + textW + 30
+        x = x + textW + 25
     end
 end
 
 function PANEL:ShowSelector()
     self.TargetAlpha = 255
     self:UpdateWeapons()
-    timer.Create("WeaponSelectorHide", 2, 1, function()
+    
+    timer.Remove("WeaponSelectorHide")
+    timer.Create("WeaponSelectorHide", 2.5, 1, function()
         if IsValid(self) then self.TargetAlpha = 0 end
     end)
 end

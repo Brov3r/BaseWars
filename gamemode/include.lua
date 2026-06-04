@@ -1,47 +1,49 @@
-DeriveGamemode("sandbox")
-
-local function IncludeShared(File)
-	include(File)
+local function IncludeShared(path)
+	include(path)
 
 	if SERVER then
-		AddCSLuaFile(File)
+		AddCSLuaFile(path)
 	end
 end
 
-local function IncludeClient(File)
+local function IncludeClient(path)
 	if CLIENT then
-		include(File)
+		include(path)
 	else
-		AddCSLuaFile(File)
+		AddCSLuaFile(path)
 	end
 end
 
-local function IncludeServer(file)
+local function IncludeServer(path)
 	if SERVER then
-		include(file)
+		include(path)
 	end
+end
+
+local function IncludeVgui()
+	local vguiFolder = "vgui/"
+	local vguiPath = engine.ActiveGamemode() .. "/gamemode/" .. vguiFolder
+    local files, dirs = file.Find(vguiPath .. "*", "LUA")
+    
+    -- Single file
+    for _, fileName in ipairs(files) do
+        if string.sub(fileName, -4) ~= ".lua" then continue end
+        IncludeClient(vguiFolder .. fileName)
+    end
 end
 
 -- SHARED
 IncludeShared("config.lua")
-IncludeShared("core/localization/ru_RU.lua") -- Localization
-IncludeShared("core/utils.lua")
-IncludeShared("core/economy/database.lua")
-IncludeShared("core/notify.lua")
-IncludeShared("core/team.lua")
+IncludeShared("utils.lua")
+IncludeShared("localization/ru_RU.lua")
 
 -- CLIENT ONLY
-IncludeClient("core/ui/fonts.lua")
-IncludeClient("core/ui/vgui/ui_circularavatar.lua")
-IncludeClient("core/ui/vgui/ui_hexavatar.lua")
-IncludeClient("core/ui/vgui/ui_scoreboard.lua")
-IncludeClient("core/ui/vgui/ui_weapon_selector.lua")
-IncludeClient("core/ui/vgui/ui_spawnmenu_props.lua")
-IncludeClient("core/ui/vgui/ui_spawnmenu_shop.lua")
-IncludeClient("core/ui/hud.lua")
-IncludeClient("core/ui/scoreboard.lua")
-IncludeClient("core/ui/nametags.lua")
-IncludeClient("core/spawnmenu.lua")
+IncludeClient("fonts.lua")
+
+-- VGUI
+IncludeVgui()
 
 -- SERVER ONLY
-IncludeServer("core/economy/payday.lua")
+
+-- Modules
+IncludeShared("modules.lua")

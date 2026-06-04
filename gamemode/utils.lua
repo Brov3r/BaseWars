@@ -3,40 +3,69 @@ BW.Utils.AnimStates = BW.Utils.AnimStates or {}
 
 function BW.Log(...)
     local args = {...}
+    local argCount = #args
+    if argCount == 0 then return end
+
     local level = "info"
-    local textParts = {}
+    local startIndex = 1
+    local firstArg = args[1]
 
-    local validLevels = {info = true, warn = true, error = true, success = true}
-    if validLevels[args[1]] then
-        level = table.remove(args, 1)
-    end
-
-    local timestamp = os.date("%H:%M:%S")
-    local prefix = "[BW]"
-
-    for i, v in ipairs(args) do
-        if type(v) == "table" then
-            textParts[#textParts + 1] = "<Table>"
-            PrintTable(v)
-        else
-            textParts[#textParts + 1] = tostring(v)
+    if type(firstArg) == "string" then
+        if firstArg == "warn" or firstArg == "error" or firstArg == "success" or firstArg == "info" then
+            level = firstArg
+            startIndex = 2
         end
     end
-    local text = table.concat(textParts, " ")
 
-    local colors = {
-        info = BW.Config.Colors.Info,
-        warn = BW.Config.Colors.Warn,
-        error = BW.Config.Colors.Error,
-        success = BW.Config.Colors.Success,
+    local cols = BW.Config.Colors
+    
+    local levelColor = cols.Info
+    if level == "warn" then levelColor = cols.Warn
+    elseif level == "error" then levelColor = cols.Error
+    elseif level == "success" then levelColor = cols.Success
+    end
+
+    local msgArgs = {
+        cols.Gray128, os.date("%H:%M:%S"),
+        cols.White,   " • ",
+        cols.Cyan,    "BW",
+        cols.White,   " - ",
+        levelColor,   string.upper(level),
+        cols.White,   " > "
     }
-    local levelColor = colors[level] or BW.Config.Colors.White
+    
+    local idx = 13 
 
-    MsgC(BW.Config.Colors.Gray, timestamp .. " ")
-    MsgC(BW.Config.Colors.Cyan, prefix .. " ")
-    MsgC(levelColor, "[" .. string.upper(level) .. "] ")
-    MsgC(BW.Config.Colors.White, text)
-    Msg("\n")
+    for i = startIndex, argCount do
+        local v = args[i]
+        
+        if type(v) == "table" then
+            if v.r and v.g and v.b then
+                msgArgs[idx] = v
+                idx = idx + 1
+            else
+                msgArgs[idx] = cols.White
+                msgArgs[idx + 1] = "<Table>"
+                idx = idx + 2
+                PrintTable(v)
+            end
+        else
+            msgArgs[idx] = tostring(v)
+            idx = idx + 1
+            
+            if i < argCount then
+                local nextArg = args[i + 1]
+                if type(nextArg) ~= "table" or not (nextArg.r and nextArg.g and nextArg.b) then
+                    msgArgs[idx] = " "
+                    idx = idx + 1
+                end
+            end
+        end
+    end
+
+    msgArgs[idx] = "\n"
+
+    MsgC(unpack(msgArgs))
 end
 
 function BW.Utils.SmoothValue(stateKey, value, animTime)

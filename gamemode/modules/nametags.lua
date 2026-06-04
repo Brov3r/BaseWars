@@ -1,28 +1,44 @@
-hook.Add("HUDDrawTargetID", "BW_HideDefaultTargetID", function()
-    return false 
-end)
+MODULE.Name   = "NameTags"
+MODULE.Author = "Brov3r"
+MODULE.Realm  = BW.REALM_CLIENT
 
-hook.Add("PostPlayerDraw", "BW_BeautifulOverheadNames", function(ply)
+local config     = BW.Config
+local colors     = config.Colors
+local nameTagCfg = config.NameTag
+
+function MODULE:Init()
+    self:RegisterHooks()
+end
+
+function MODULE:RegisterHooks()
+    hook.Add("HUDDrawTargetID", "BW_HideDefaultTargetID", function()
+        return false 
+    end)
+
+    hook.Add("PostPlayerDraw", "BW_BeautifulOverheadNames", function(ply)
+        self:DrawOverheadName(ply)
+    end)
+end
+
+function MODULE:DrawOverheadName(ply)
     if not IsValid(ply) or not ply:Alive() then return end
     if ply == LocalPlayer() then return end
     if ply:GetNoDraw() then return end
-
-    local cfg = BW.Config.NameTag
-    if not cfg then return end
+    if not nameTagCfg then return end
 
     local eyePos = LocalPlayer():EyePos()
     local plyPos = ply:GetPos()
     local dist   = eyePos:Distance(plyPos)
 
-    if dist > cfg.MaxDist then return end
+    if dist > nameTagCfg.MaxDist then return end
 
     local targetAlpha = 255
-    if dist > (cfg.MaxDist - cfg.FadeDist) then
-        targetAlpha = math.Remap(dist, cfg.MaxDist - cfg.FadeDist, cfg.MaxDist, 255, 0)
+    if dist > (nameTagCfg.MaxDist - nameTagCfg.FadeDist) then
+        targetAlpha = math.Remap(dist, nameTagCfg.MaxDist - nameTagCfg.FadeDist, nameTagCfg.MaxDist, 255, 0)
     end
 
     ply._overheadAlpha = ply._overheadAlpha or 255
-    ply._overheadAlpha = Lerp(FrameTime() * cfg.FadeSpeed, ply._overheadAlpha, targetAlpha)
+    ply._overheadAlpha = Lerp(FrameTime() * nameTagCfg.FadeSpeed, ply._overheadAlpha, targetAlpha)
 
     if ply._overheadAlpha < 1 then return end
 
@@ -40,14 +56,13 @@ hook.Add("PostPlayerDraw", "BW_BeautifulOverheadNames", function(ply)
 
     local currentAlpha = ply._overheadAlpha
 
-    cam.Start3D2D(pos, ang, cfg.Scale)
-        
+    cam.Start3D2D(pos, ang, nameTagCfg.Scale)
         local nick      = ply:Nick()
-        local teamColor = team.GetColor(ply:Team()) or BW.Config.Colors.White
+        local teamColor = team.GetColor(ply:Team()) or colors.White
         local teamName  = team.GetName(ply:Team()) or ""
 
-        local textWhite = Color(BW.Config.Colors.White.r, BW.Config.Colors.White.g, BW.Config.Colors.White.b, currentAlpha)
-        local textBlack = Color(BW.Config.Colors.Black.r, BW.Config.Colors.Black.g, BW.Config.Colors.Black.b, currentAlpha)
+        local textWhite = Color(colors.White.r, colors.White.g, colors.White.b, currentAlpha)
+        local textBlack = Color(colors.Black.r, colors.Black.g, colors.Black.b, currentAlpha)
         local textTeam  = Color(teamColor.r, teamColor.g, teamColor.b, currentAlpha)
 
         draw.SimpleTextOutlined(
@@ -77,4 +92,4 @@ hook.Add("PostPlayerDraw", "BW_BeautifulOverheadNames", function(ply)
         end
 
     cam.End3D2D()
-end)
+end
