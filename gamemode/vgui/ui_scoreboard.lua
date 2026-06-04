@@ -102,9 +102,9 @@ function PANEL:CreateHeader()
         if iconMat and not iconMat:IsError() then
             surface.SetDrawColor(255, 255, 255, 255)
             surface.SetMaterial(iconMat)
-            surface.DrawTexturedRect(firstIconX, h/2 - firstIconW/2, firstIconW, firstIconW)
+            surface.DrawTexturedRect(firstIconX, h/2 - firstIconW/2 - 5, firstIconW, firstIconW)
         end
-        draw.SimpleText(firstCol.header, "Inter18", self.AvatarOffsetX, h/2, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+        draw.SimpleText(firstCol.header, "Inter18", self.AvatarOffsetX, h/2 - 5, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
 
         for i = 2, #self.Columns do
             local col = self.Columns[i]
@@ -122,10 +122,10 @@ function PANEL:CreateHeader()
             if colIconMat and not colIconMat:IsError() then
                 surface.SetDrawColor(255, 255, 255, 255)
                 surface.SetMaterial(colIconMat)
-                surface.DrawTexturedRect(startX, h/2 - iconW/2, iconW, iconW)
-                draw.SimpleText(col.header, "Inter18", startX + iconW + gap, h/2, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
+                surface.DrawTexturedRect(startX, h/2 - iconW/2 - 5, iconW, iconW)
+                draw.SimpleText(col.header, "Inter18", startX + iconW + gap, h/2 - 5, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
             else
-                draw.SimpleText(col.header, "Inter18", centerX, h/2, self.Colors.White, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText(col.header, "Inter18", centerX, h/2 - 5, self.Colors.White, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
             end
         end
     end
