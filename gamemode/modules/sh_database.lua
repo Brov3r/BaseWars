@@ -36,8 +36,30 @@ MODULE.Stats = {
 
 local PLAYER = FindMetaTable("Player")
 
-function PLAYER:GetMaxXP()
-    return math.floor(500 * math.pow(self:GetLevel(), 1.5))
+-- CUSTOM OVERRIDE
+function PLAYER:GetMaxXP(inputLevel)
+    local level = inputLevel or self:GetLevel()
+    return math.floor(500 * math.pow(level, 1.5))
+end
+
+if SERVER then
+    function PLAYER:PostSetXP(oldValue, newValue)
+        local maxXP = self:GetMaxXP()
+        if newValue >= maxXP then
+            local level = self:GetLevel()
+            local remainder = newValue
+            
+            while remainder >= maxXP do
+                remainder = remainder - maxXP
+                level = level + 1
+                
+                maxXP = self:GetMaxXP(level)
+            end
+            
+            self:SetLevel(level)
+            self:SetXP(remainder, true)
+        end
+    end
 end
 
 local function GetNWType(statType)
@@ -79,6 +101,12 @@ function MODULE:Init()
         if SERVER then
             if methods.set ~= false then
                 PLAYER["Set" .. key] = function(ply, value, silent)
+                    if ply["PreSet" .. key] then
+                        local overrideVal, cancel = ply["PreSet" .. key](ply, value)
+                        if cancel then return end
+                        if overrideVal ~= nil then value = overrideVal end
+                    end
+
                     local oldValue = ply["Get" .. key](ply)
                     if oldValue == value then return end
 
@@ -95,6 +123,10 @@ function MODULE:Init()
                             color_white, " -> ", 
                             BW.Config and BW.Config.Colors and BW.Config.Colors.Success or Color(0,255,0), tostring(value)
                         )
+                    end
+
+                    if ply["PostSet" .. key] then
+                        ply["PostSet" .. key](ply, oldValue, value)
                     end
                 end
             end

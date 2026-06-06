@@ -43,7 +43,7 @@ function MODULE:CreateScoreboard()
         id = "team", 
         header = Translate("Scoreboard.Team", "Team"), 
         icon = "icon16/group.png", 
-        width = 250, 
+        width = 320, 
         align = TEXT_ALIGN_CENTER, 
         maxWidth = 150,
         getter = function(ply) return team.GetName(ply:Team()) or "-" end
@@ -68,7 +68,7 @@ function MODULE:CreateScoreboard()
     })
 
 	self.scoreboardPanel:AddColumn({
-        id = "deaths", 
+        id = "reputation", 
         header = "", 
         icon = "icon16/heart.png", 
         width = 50, 

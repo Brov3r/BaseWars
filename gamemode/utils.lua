@@ -3,6 +3,7 @@ BW.Utils.AnimStates = BW.Utils.AnimStates or {}
 
 BW.Lang = BW.Lang or {}
 BW.Lang._Cache = BW.Lang._Cache or {}
+local cv_lang = GetConVar("gmod_language")
 
 local textCache = {} 
 
@@ -69,62 +70,38 @@ function BW.Utils.Log(...)
     MsgC(unpack(msgArgs))
 end
 
-local function NormalizeKey(str)
-    return string.lower(str):gsub("[_.%s%-]", "")
-end
-
-local function FindTranslation(tbl, normalizedKey)
+local function GetExactTranslation(tbl, id)
     if type(tbl) ~= "table" then return nil end
     
-    for k, v in pairs(tbl) do
-        if NormalizeKey(k) == normalizedKey then
-            return v
+    if not string.find(id, ".", 1, true) then
+        return type(tbl[id]) == "string" and tbl[id] or nil
+    end
+
+    local current = tbl
+    for part in string.gmatch(id, "[^.]+") do
+        if type(current) == "table" then
+            current = current[part]
+        else
+            return nil
         end
     end
     
-    for _, v in pairs(tbl) do
-        if type(v) == "table" then
-            local found = FindTranslation(v, normalizedKey)
-            if found ~= nil then return found end
-        end
-    end
-    
-    return nil
+    return type(current) == "string" and current or nil
 end
 
 function BW.Utils.Translate(id, fallback)
-    if not id then return fallback or "" end
+    if not id or id == "" then return fallback or "" end
     
-    local lang = GetConVar("gmod_language"):GetString() or "en"
+    local lang = (cv_lang and cv_lang:GetString()) or "en"
     local cacheKey = lang .. ":" .. id
     
-    if BW.Lang._Cache[cacheKey] ~= nil then
-        return BW.Lang._Cache[cacheKey]
-    end
+    local cached = BW.Lang._Cache[cacheKey]
+    if cached ~= nil then return cached end
+
+    local result = GetExactTranslation(BW.Lang[lang], id)
     
-    local result = nil
-    
-    if string.find(id, "%.") then
-        local tbl = BW.Lang[lang]
-        for part in string.gmatch(id, "[^.]+") do
-            if type(tbl) == "table" then
-                tbl = tbl[part]
-            else
-                tbl = nil
-                break
-            end
-        end
-        if type(tbl) == "string" then
-            result = tbl
-        end
-    end
-    
-    if not result and BW.Lang[lang] then
-        result = FindTranslation(BW.Lang[lang], NormalizeKey(id))
-    end
-    
-    if not result and lang ~= "en" and BW.Lang["en"] then
-        result = FindTranslation(BW.Lang["en"], NormalizeKey(id))
+    if not result and lang ~= "en" then
+        result = GetExactTranslation(BW.Lang["en"], id)
     end
     
     if not result and CLIENT then
