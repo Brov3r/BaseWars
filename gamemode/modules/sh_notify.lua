@@ -1,18 +1,21 @@
-MODULE.Name   = "Notify"
+local MODULE = MODULE
+
+MODULE.Name = "Notify"
 MODULE.Author = "Brov3r"
-MODULE.Realm  = BW.REALM_SHARED
+MODULE.Require = {}
+
+local PLAYER = FindMetaTable("Player")
 
 local config    = BW.Config
 local colors    = config.Colors
-local translate = (BW.Translate and BW.Translate.Notify) or {}
 local mod       = MODULE
 
 local NOTIFY_TYPES = {
-    [0] = {logLevel = "info",    name = translate.Info or "Info",    color = colors.Info, icon = "icon16/information.png"},
-    [1] = {logLevel = "error",   name = translate.Error or "Error",  color = colors.Error, icon = "icon16/exclamation.png"},
-    [2] = {logLevel = "success", name = translate.Success or "Success", color = colors.Success, icon = "icon16/tick.png"},
-    [3] = {logLevel = "warn",    name = translate.Warn or "Warning", color = colors.Warn,  icon = "icon16/error.png"},
-    [4] = {logLevel = "info",    name = translate.Hint or "Hint",    color = colors.Hint or colors.Info, icon = "icon16/lightbulb.png"},
+    [0] = {logLevel = "info",    name = Translate("Notify.Info", "Info"),    color = colors.Info, icon = "icon16/information.png"},
+    [1] = {logLevel = "error",   name = Translate("Notify.Error", "Error"),  color = colors.Error, icon = "icon16/exclamation.png"},
+    [2] = {logLevel = "success", name = Translate("Notify.Success", "Success"), color = colors.Success, icon = "icon16/tick.png"},
+    [3] = {logLevel = "warn",    name = Translate("Notify.Warn", "Warning"), color = colors.Warn,  icon = "icon16/error.png"},
+    [4] = {logLevel = "info",    name = Translate("Notify.Hint", "Hint"),    color = colors.Hint or colors.Info, icon = "icon16/lightbulb.png"},
 }
 
 NOTIFY_INFO    = 0
@@ -20,8 +23,6 @@ NOTIFY_ERROR   = 1
 NOTIFY_SUCCESS = 2
 NOTIFY_WARNING = 3
 NOTIFY_HINT    = 4
-
-local PLAYER = FindMetaTable("Player")
 
 function MODULE:Init()
     if SERVER then
@@ -51,20 +52,20 @@ function MODULE:InitClient()
     self.SLIDE_SPEED       = (config.Notify and config.Notify.SlideSpeed) or 5
 
     function PLAYER:Notify(notifType, text, duration)
-        mod:AddNotification(notifType, text, duration)
+        MODULE:AddNotification(notifType, text, duration)
     end
 
     local gm = gmod.GetGamemode()
     if gm then
         gm.AddNotify = function(self, ply, msgType, text)
             if IsValid(ply) and ply == LocalPlayer() then
-                mod:AddNotification(mod:MapLegacyType(msgType), text, 5)
+                MODULE:AddNotification(MODULE:MapLegacyType(msgType), text, 5)
             end
         end
     end
 
     function notification.AddLegacy(text, legacyType, duration)
-        mod:AddNotification(mod:MapLegacyType(legacyType), text, duration or 5)
+        MODULE:AddNotification(MODULE:MapLegacyType(legacyType), text, duration or 5)
     end
 
     self:RegisterHooks()
@@ -76,11 +77,11 @@ function MODULE:RegisterHooks()
     end)
 
     net.Receive("BW_CustomNotify", function()
-        mod:AddNotification(net.ReadUInt(8), net.ReadString(), net.ReadFloat())
+        MODULE:AddNotification(net.ReadUInt(8), net.ReadString(), net.ReadFloat())
     end)
 
     hook.Add("HUDPaint", "BW_CustomNotify", function()
-        return mod:DrawNotify()
+        return MODULE:DrawNotify()
     end)
 end
 
@@ -104,16 +105,19 @@ function MODULE:DrawNotify()
         end
 
         local NOTIF_WIDTH = notif.width
-        local NOTIF_HEIGHT = notif.height
+        local NOTIF_HEIGHT = notif.height 
         notif.targetX = scrW - NOTIF_WIDTH - 20
 
-        if elapsed < 0.3 then
-            notif.alpha = math.Approach(notif.alpha or 0, 255, ft * 600)
-            notif.x = Lerp(ft * self.SLIDE_SPEED, notif.x, notif.targetX)
-        elseif timeLeft < 0.5 then
-            notif.alpha = math.Approach(notif.alpha or 255, 0, ft * 500)
+        if elapsed < 0.4 then
+            notif.alpha = math.Approach(notif.alpha or 0, 255, ft * 700)
+            notif.x = Lerp(ft * self.SLIDE_SPEED * 1.2, notif.x, notif.targetX)
+            notif.scale = Lerp(ft * 8, notif.scale or 0.95, 1)
+        elseif timeLeft < 0.6 then
+            notif.alpha = math.Approach(notif.alpha or 255, 0, ft * 400)
+            notif.scale = Lerp(ft * 6, notif.scale or 1, 0.95)
         else
             notif.alpha = 255
+            notif.scale = 1
         end
 
         local alpha = math.Clamp(notif.alpha or 0, 0, 255)
@@ -125,31 +129,43 @@ function MODULE:DrawNotify()
         local y = currentY + self.NOTIF_SPACING
         local col = notif.color
 
-        draw.RoundedBox(0, x + 2, y + 2, NOTIF_WIDTH, NOTIF_HEIGHT, Color(0, 0, 0, alpha * 0.3))
-        draw.RoundedBox(0, x, y, NOTIF_WIDTH, NOTIF_HEIGHT, Color(40, 40, 40, alpha * 0.95))
+        draw.RoundedBox(8, x, y, NOTIF_WIDTH, NOTIF_HEIGHT, Color(22, 22, 26, alpha * 0.95))
+        draw.RoundedBox(8, x, y, NOTIF_WIDTH, 1, Color(255, 255, 255, alpha * 0.05))
 
-        draw.RoundedBox(0, x, y, 6, NOTIF_HEIGHT, Color(col.r, col.g, col.b, alpha))
+        draw.RoundedBox(4, x, y, 4, NOTIF_HEIGHT, Color(col.r, col.g, col.b, alpha))
 
-        local mat = mod:GetMaterial(notif.icon)
+        local mat = self:GetMaterial(notif.icon)
         if mat and not mat:IsError() then
+            draw.RoundedBox(6, x + 12, y + 8, 36, 36, Color(col.r, col.g, col.b, alpha * 0.1))
             surface.SetDrawColor(255, 255, 255, alpha)
             surface.SetMaterial(mat)
-            surface.DrawTexturedRect(x + 15, y + 10, 32, 32)
+            surface.DrawTexturedRect(x + 18, y + 14, 24, 24)
         end
 
-        draw.SimpleText(notif.typeName, "Inter18", x + 55, y + 10,
+        draw.SimpleText(notif.typeName, "Inter18", x + 58, y + 8,
             Color(col.r, col.g, col.b, alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 
-        local textY = y + 30
+        local textY = y + 29
         for _, line in ipairs(notif.lines) do
-            draw.SimpleText(line, "Inter16Thin", x + 55, textY,
-                Color(255, 255, 255, alpha * 0.9), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-            textY = textY + 20
+            draw.SimpleText(line, "Inter16Thin", x + 58, textY,
+                Color(220, 220, 220, alpha * 0.9), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+            textY = textY + 18
         end
 
-        local progressWidth = (NOTIF_WIDTH - 10) * math.Clamp(timeLeft / notif.duration, 0, 1)
-        draw.RoundedBox(0, x + 5, y + NOTIF_HEIGHT - 5, progressWidth, 5,
-            Color(col.r, col.g, col.b, alpha))
+        local barX = x
+        local barWidth = NOTIF_WIDTH
+        local barHeight = 4
+        local barY = y + NOTIF_HEIGHT - barHeight
+        
+        local progressWidth = barWidth * math.Clamp(timeLeft / notif.duration, 0, 1)
+
+        draw.RoundedBox(barHeight / 2, barX, barY, barWidth, barHeight, Color(col.r * 0.5, col.g * 0.5, col.b * 0.5, alpha * 0.4))
+        
+        if progressWidth > 0 then
+            draw.RoundedBox(barHeight / 2, barX, barY, progressWidth, barHeight, Color(col.r, col.g, col.b, alpha))
+
+            draw.RoundedBox(barHeight / 2, barX, barY, progressWidth, 1, Color(255, 255, 255, alpha * 0.25))
+        end
     end
 end
 
@@ -230,6 +246,6 @@ function MODULE:AddNotification(notifType, text, duration)
         table.remove(self.notifications)
     end
 
-    surface.PlaySound("buttons/blip1.wav")
-    if BW.Log then BW.Log(typeData.logLevel, "[Notify]", text) end
+    surface.PlaySound("HL1/fvox/blip.wav")
+    if Log then Log(typeData.logLevel, "[Notify]", text) end
 end

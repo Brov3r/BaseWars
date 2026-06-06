@@ -41,10 +41,47 @@ BW.Config = {
 		Error     = Color(255, 100, 100, 255),
 		Success   = Color(100, 255, 100, 255),
 	},
+	HUD = {
+        Dimensions = {
+            Avatar       	= 100,
+			AvatarExpWidth	= 10,
+			AvatarPadding	= 10,
+            HealthBarH   	= 15,
+            HealthBarW   	= 200,
+            ArmorBarH    	= 8,
+            ArmorBarW    	= 200,
+        },
+        Margin             = 10,
+        AvatarCornerOffset = 20,
+        AnimTime          = 0.2,
+    },
+	Notify = {
+		MaxNotification 	= 5,
+		Spacing 			= 10,
+		SlideSpeed 			= 8,
+	},
 	Motion = {
+		EnableBHop	= true,
         WalkSpeed   = 125,
         RunSpeed    = 250,
         JumpPower   = 200
+    },
+	AllowedTools = {
+        ["weld"] = true,
+        ["button"] = true,
+        ["lamp"] = true,
+        ["nocollide"] = true,
+        ["camera"] = true,
+        ["colour"] = true,
+        ["material"] = true,
+        ["remover"] = true
+    },
+	PlayerLoadout = {
+        "weapon_physcannon",
+        "gmod_tool",
+        "hands",
+        "weapon_physgun",
+        "gmod_camera"
     },
 	NameTag = {
         MaxDist   = 800,
@@ -52,23 +89,14 @@ BW.Config = {
         FadeSpeed = 12,
         Scale     = 0.18,
     },
-	Notify = {
-		MaxNotification 	= 5,
-		Spacing 			= 10,
-		SlideSpeed 			= 8,
+	Fog = {
+		Enabled = true,
+		Mode = MATERIAL_FOG_LINEAR,
+		Start = 1500,
+		["End"] = 3000,
+		MaxDensity = 1,
+		Color = Color(191, 191, 191),
 	},
-	HUD = {
-        Dimensions = {
-            Avatar       = 78,
-            HealthBarH   = 15,
-            HealthBarW   = 200,
-            ArmorBarH    = 8,
-            ArmorBarW    = 200,
-        },
-        Margin             = 10,
-        AvatarCornerOffset = 20,
-        AnimTime          = 0.2,
-    },
 	Props = {
         "models/props_borealis/mooring_cleat01.mdl",
         "models/props_borealis/borealis_door001a.mdl",
@@ -133,36 +161,32 @@ BW.Config = {
         "models/mechanics/solid_steel/step_beam_32.mdl",
         "models/mechanics/solid_steel/sheetmetal_box90_4.mdl",
     },
-    AllowedTools = {
-        ["weld"] = true,
-        ["button"] = true,
-        ["lamp"] = true,
-        ["nocollide"] = true,
-        ["camera"] = true,
-        ["colour"] = true,
-        ["material"] = true,
-        ["remover"] = true
-    },
-	PlayerLoadout = {
-        "weapon_physcannon",
-        "gmod_tool",
-        "weapon_physgun",
-        "gmod_camera"
-    },
 	PlayerGroups = {
+        ["superadmin"] = {
+            PayDayMultiplier = 2.5,
+			PrefixText = "Owner",
+			PrefixIcon = "icon16/shield.png"
+        },
         ["admin"] = {
             PayDayMultiplier = 2.5,
+			PrefixText = "Admin",
+			PrefixIcon = "icon16/ruby.png"
         },
         ["vip"] = {
             PayDayMultiplier = 2.0,
+			PrefixText = "VIP",
+			PrefixIcon = "icon16/star.png"
         },
         ["user"] = {
             PayDayMultiplier = 1.0,
         },
     },
-    Currency          = "$",
-    StartMoney        = 5000,
-    PayDayInterval    = 300,
-    PayDayDefaultMin  = 500,
-    PayDayDefaultMax  = 800,
+	Economy = {
+		Currency 				= "$",
+		StartMoney 				= 5000,
+		PayDayInterval    		= 300,
+		PayDayDefaultMin  		= 500,
+		PayDayDefaultMax  		= 800,
+		PayDayDefaultMultiplier = 1,
+	},
 }

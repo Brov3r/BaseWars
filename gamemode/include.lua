@@ -1,49 +1,71 @@
-local function IncludeShared(path)
-	include(path)
-
-	if SERVER then
-		AddCSLuaFile(path)
-	end
+-- Base loader
+local function loadSH(path)
+    include(path)
+    if SERVER then AddCSLuaFile(path) end
 end
 
-local function IncludeClient(path)
-	if CLIENT then
-		include(path)
-	else
-		AddCSLuaFile(path)
-	end
+local function loadCL(path)
+    if CLIENT then include(path)
+    else AddCSLuaFile(path) end
 end
 
-local function IncludeServer(path)
-	if SERVER then
-		include(path)
-	end
+local function loadSV(path)
+    if SERVER then include(path) end
 end
 
-local function IncludeVgui()
-	local vguiFolder = "vgui/"
-	local vguiPath = engine.ActiveGamemode() .. "/gamemode/" .. vguiFolder
-    local files, dirs = file.Find(vguiPath .. "*", "LUA")
+-- LoadDir
+local function loadDirectory(folderName, loadFunc, fileMask)
+    fileMask = fileMask or "*.lua"
     
-    -- Single file
-    for _, fileName in ipairs(files) do
-        if string.sub(fileName, -4) ~= ".lua" then continue end
-        IncludeClient(vguiFolder .. fileName)
+    local currentGamemode = engine.ActiveGamemode()
+    local fullPath = currentGamemode .. "/gamemode/" .. folderName .. "/"
+    
+    local files = file.Find(fullPath .. fileMask, "LUA")
+    
+    if not files or #files == 0 then
+        return
+    end
+    
+    for _, f in ipairs(files) do
+        loadFunc(folderName .. "/" .. f)
     end
 end
 
--- SHARED
-IncludeShared("config.lua")
-IncludeShared("utils.lua")
-IncludeShared("localization/ru_RU.lua")
+-- Fonts
+local function mkFont(name, font, size, weight)
+    surface.CreateFont(name, {
+        font = font,
+        size = size,
+        extended = true,
+        weight = weight,
+        antialias = true
+    })
+end
 
--- CLIENT ONLY
-IncludeClient("fonts.lua")
+local function initFonts()
+    local files = file.Find("resource/fonts/*.ttf", "GAME")
+    
+    for _, f in ipairs(files) do
+        if SERVER then
+            resource.AddFile("resource/fonts/" .. f)
+        else
+            local fontBase = string.StripExtension(f)
+            
+            for i = 10, 30, 2 do
+                mkFont(fontBase .. i, fontBase, i, 900)
+                mkFont(fontBase .. i .. "Thin", fontBase, i, 400)
+            end
+        end
+    end
+end
 
--- VGUI
-IncludeVgui()
+-- LOAD LUA
+loadSH("config.lua")
+loadSH("utils.lua")
 
--- SERVER ONLY
+initFonts()
+loadDirectory("localization", loadSH)
+loadDirectory("vgui", loadCL)
 
 -- Modules
-IncludeShared("modules.lua")
+loadSH("modules.lua")

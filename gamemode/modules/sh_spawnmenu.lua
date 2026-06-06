@@ -1,6 +1,8 @@
-MODULE.Name   = "SpawnMenu"
+local MODULE = MODULE
+
+MODULE.Name = "Spawnmenu"
 MODULE.Author = "Brov3r"
-MODULE.Realm  = BW.REALM_SHARED
+MODULE.Require = { "database", "notify"}
 
 local config = BW.Config
 local oldGetTools = CLIENT and spawnmenu.GetTools or nil
@@ -40,7 +42,7 @@ function MODULE:RegisterToolRestriction()
 
         if not isAllowed then
             local toolWeapon = weapons.Get("gmod_tool")
-            local firstTool = "physgun" -- Фоллбэк по умолчанию
+            local firstTool = "physgun"
 
             if toolWeapon and toolWeapon.Tool then
                 local toolList = table.GetKeys(toolWeapon.Tool)
@@ -120,9 +122,8 @@ function MODULE:RegisterSpawnMenuHooks()
         local propsPanel = vgui.Create("BW_SpawnMenu_Props", tabs)
         local shopPanel = vgui.Create("BW_SpawnMenu_Shop", tabs)
 
-        local translate = (BW.Translate and BW.Translate.SpawnMenu) or {}
-        local propsTabName = translate.PropsTabName or "Props"
-        local shopTabName = translate.ShopTabName or "Shop"
+        local propsTabName = Translate("SpawnMenu.PropsTabName", "Props")
+        local shopTabName = Translate("SpawnMenu.ShopTabName", "Shop")
 
         local propsSheet = tabs:AddSheet(propsTabName, propsPanel, "icon16/box.png")
         tabs:AddSheet(shopTabName, shopPanel, "icon16/money.png")

@@ -1,22 +1,23 @@
-MODULE.Name   = "NameTags"
+local MODULE = MODULE
+
+MODULE.Name = "HUD"
 MODULE.Author = "Brov3r"
-MODULE.Realm  = BW.REALM_CLIENT
+MODULE.Require = { "database" }
 
 local config     = BW.Config
 local colors     = config.Colors
 local nameTagCfg = config.NameTag
 
-function MODULE:Init()
-    self:RegisterHooks()
-end
+local lvlIcon = Material("icon16/award_star_gold_3.png")
+local repIcon = Material("icon16/heart.png")
 
-function MODULE:RegisterHooks()
+function MODULE:Init()
     hook.Add("HUDDrawTargetID", "BW_HideDefaultTargetID", function()
         return false 
     end)
 
     hook.Add("PostPlayerDraw", "BW_BeautifulOverheadNames", function(ply)
-        self:DrawOverheadName(ply)
+        MODULE:DrawOverheadName(ply)
     end)
 end
 
@@ -45,7 +46,7 @@ function MODULE:DrawOverheadName(ply)
     local pos
     local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
     if headBone then
-        pos = ply:GetBonePosition(headBone) + Vector(0, 0, 15)
+        pos = ply:GetBonePosition(headBone) + Vector(0, 0, 18)
     else
         pos = ply:GetPos() + Vector(0, 0, ply:OBBMaxs().z + 12)
     end
@@ -90,6 +91,57 @@ function MODULE:DrawOverheadName(ply)
                 textBlack
             )
         end
+
+        local lvl = ply.GetLevel and ply:GetLevel() or 1
+        local rep = ply.GetReputation and ply:GetReputation() or 0
+        local lvlStr = tostring(lvl)
+        local repStr = tostring(rep)
+
+        surface.SetFont("Inter14")
+        local lvlW = surface.GetTextSize(lvlStr)
+        local repW = surface.GetTextSize(repStr)
+
+        local statsY = 34
+        local iconSize = 10
+        local iconTextGap = 3
+        local blockGap = 12
+
+        local totalWidth = iconSize + iconTextGap + lvlW + blockGap + iconSize + iconTextGap + repW
+        local startX = -totalWidth / 2
+
+        surface.SetMaterial(lvlIcon)
+        surface.SetDrawColor(255, 255, 255, currentAlpha)
+        surface.DrawTexturedRect(startX, statsY - iconSize / 2, iconSize, iconSize)
+        
+        draw.SimpleTextOutlined(
+            lvlStr, 
+            "Inter14", 
+            startX + iconSize + iconTextGap, 
+            statsY, 
+            textWhite, 
+            TEXT_ALIGN_LEFT, 
+            TEXT_ALIGN_CENTER,
+            1,
+            textBlack
+        )
+
+        local repX = startX + iconSize + iconTextGap + lvlW + blockGap
+        
+        surface.SetMaterial(repIcon)
+        surface.SetDrawColor(255, 255, 255, currentAlpha)
+        surface.DrawTexturedRect(repX, statsY - iconSize / 2, iconSize, iconSize)
+        
+        draw.SimpleTextOutlined(
+            repStr, 
+            "Inter14", 
+            repX + iconSize + iconTextGap, 
+            statsY, 
+            textWhite, 
+            TEXT_ALIGN_LEFT, 
+            TEXT_ALIGN_CENTER,
+            1,
+            textBlack
+        )
 
     cam.End3D2D()
 end

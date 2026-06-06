@@ -9,7 +9,6 @@ end
 local PANEL = {}
 
 function PANEL:Init()
-    -- Безопасное получение конфига с фоллбэками
     local cfg = BW.Config or {}
     local sbCfg = cfg.Scoreboard or {}
     local colors = cfg.Colors or {}
@@ -25,7 +24,6 @@ function PANEL:Init()
     self.LeftMargin = sbCfg.LeftMargin or 20
     self.Spacing = sbCfg.Spacing or 2
 
-    -- Безопасные цвета: если в конфиге их нет, используем стандартные
     self.Colors = {
         White      = colors.White or Color(255, 255, 255, 255),
         DarkGray   = colors.DarkGray or Color(60, 60, 60, 255),
@@ -35,12 +33,13 @@ function PANEL:Init()
 
     self.Columns = {}
     self.Rows = {}
+    self.AvatarColumnIndex = nil  -- Индекс колонки с аватаром
     
     self:SetAlpha(0)
 end
 
 function PANEL:AddColumn(colData)
-    table.insert(self.Columns, {
+    local col = {
         id = colData.id,
         header = colData.header or "",
         icon = colData.icon,
@@ -48,8 +47,17 @@ function PANEL:AddColumn(colData)
         align = colData.align or TEXT_ALIGN_CENTER,
         color = colData.color or self.Colors.White,
         getter = colData.getter,
-        maxWidth = colData.maxWidth
-    })
+        maxWidth = colData.maxWidth,
+        hasAvatar = colData.hasAvatar or false,
+        hasPrefixIcon = colData.hasPrefixIcon or false,
+        prefixIconGetter = colData.prefixIconGetter,
+        prefixIconSize = colData.prefixIconSize or 16,
+    }
+    table.insert(self.Columns, col)
+    
+    if col.hasAvatar and not self.AvatarColumnIndex then
+        self.AvatarColumnIndex = #self.Columns
+    end
 end
 
 function PANEL:ComputeColumnPositions()
@@ -92,21 +100,7 @@ function PANEL:CreateHeader()
     self.headerPanel.Paint = function(s, w, h)
         if #self.Columns == 0 then return end
 
-        local firstCol = self.Columns[1]
-        local iconMat = firstCol.icon and GetIconMaterial(firstCol.icon)
-        
-        local firstIconW = 16
-        local firstGap = 6
-        local firstIconX = self.AvatarOffsetX - firstIconW - firstGap
-
-        if iconMat and not iconMat:IsError() then
-            surface.SetDrawColor(255, 255, 255, 255)
-            surface.SetMaterial(iconMat)
-            surface.DrawTexturedRect(firstIconX, h/2 - firstIconW/2 - 5, firstIconW, firstIconW)
-        end
-        draw.SimpleText(firstCol.header, "Inter18", self.AvatarOffsetX, h/2 - 5, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-
-        for i = 2, #self.Columns do
+        for i = 1, #self.Columns do
             local col = self.Columns[i]
             local left = self.colPositions[i] - self.LeftMargin
             local centerX = left + col.width / 2
@@ -116,7 +110,15 @@ function PANEL:CreateHeader()
             local iconW = 16
             local gap = 6
             local totalW = (col.icon and (iconW + gap) or 0) + textW
+            
             local startX = centerX - totalW / 2
+            if col.hasAvatar then
+                startX = self.AvatarOffsetX
+            end
+            
+            if col.header == nil or col.header == "" then
+                startX = startX + 2
+            end
 
             local colIconMat = col.icon and GetIconMaterial(col.icon)
             if colIconMat and not colIconMat:IsError() then
@@ -190,12 +192,8 @@ function PANEL:RefreshRows()
             surface.DrawRect(0, 0, w, h)
 
             local y = h / 2
-            local nick = s.nick
-            if nick then
-                draw.SimpleText(BW.Utils.TruncateText(nick, "Inter16Thin", 150), "Inter16Thin", self.AvatarOffsetX + self.Spacing * 2, y, self.Colors.White, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
 
-            for c = 2, #self.Columns do
+            for c = 1, #self.Columns do
                 local col = self.Columns[c]
                 local value = s["col_" .. col.id]
                 
@@ -212,6 +210,23 @@ function PANEL:RefreshRows()
                     elseif col.align == TEXT_ALIGN_RIGHT then
                         x = left + col.width - 5
                     end
+                    
+                    if col.hasAvatar then
+                        x = self.AvatarOffsetX + self.Spacing * 2
+                    end
+
+                    local prefixIconPath = s["col_prefixIcon_" .. col.id]
+                    if prefixIconPath and col.hasPrefixIcon then
+                        local iconMat = GetIconMaterial(prefixIconPath)
+                        if iconMat and not iconMat:IsError() then
+                            local iconSize = col.prefixIconSize or 16
+                            local iconGap = 4
+                            surface.SetDrawColor(255, 255, 255, 255)
+                            surface.SetMaterial(iconMat)
+                            surface.DrawTexturedRect(x, y - iconSize/2, iconSize, iconSize)
+                            x = x + iconSize + iconGap
+                        end
+                    end
 
                     local textColor = s["col_color_" .. col.id] or col.color or self.Colors.White
                     draw.SimpleText(displayValue, "Inter16Thin", x, y, textColor, col.align, TEXT_ALIGN_CENTER)
@@ -219,10 +234,12 @@ function PANEL:RefreshRows()
             end
         end
 
-        local avatar = vgui.Create("CircularAvatar", row)
-        avatar:SetSize(self.AvatarSize, self.AvatarSize)
-        avatar:SetPos(5, (self.RowHeight - self.AvatarSize) / 2)
-        row.avatar = avatar
+        if self.AvatarColumnIndex then
+            local avatar = vgui.Create("CircularAvatar", row)
+            avatar:SetSize(self.AvatarSize, self.AvatarSize)
+            avatar:SetPos(5, (self.RowHeight - self.AvatarSize) / 2)
+            row.avatar = avatar
+        end
 
         local muteBtn = vgui.Create("DButton", row)
         muteBtn:SetSize(self.MuteBtnWidth, self.MuteBtnWidth)
@@ -257,19 +274,23 @@ function PANEL:RefreshRows()
         local row = self.Rows[i]
         
         row.ply = ply
-        row.nick = ply:Nick()
 
-        for j = 2, #self.Columns do
+        for j = 1, #self.Columns do
             local col = self.Columns[j]
             if col.getter then
                 row["col_" .. col.id] = col.getter(ply)
             end
+            
+            if col.hasPrefixIcon and col.prefixIconGetter then
+                row["col_prefixIcon_" .. col.id] = col.prefixIconGetter(ply)
+            end
+            
             if col.id == "team" then
                 row["col_color_team"] = team.GetColor(ply:Team()) or self.Colors.White
             end
         end
 
-        if row._cachedPly ~= ply then
+        if row.avatar and row._cachedPly ~= ply then
             row.avatar:SetPlayer(ply, 64)
             row._cachedPly = ply
         end

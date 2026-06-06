@@ -5,27 +5,33 @@ BW.REALM_SHARED = 3
 BW.Modules = BW.Modules or {}
 
 local string_sub      = string.sub
-local string_match    = string.match
 local debug_traceback = debug.traceback
 local ipairs          = ipairs
-local Log             = BW.Log
+local pairs           = pairs
+local table_insert    = table.insert
 local cols            = BW.Config.Colors
 
 local MODULES_PATH    = engine.ActiveGamemode() .. "/gamemode/modules/"
 
--- Base module
 local MODULE_BASE = {}
 MODULE_BASE.__index = MODULE_BASE
 
-function MODULE_BASE:New(defaultName, defaultRealm)
+function MODULE_BASE:New(id, realm)
     local instance = setmetatable({}, self)
-    instance.Name = defaultName or "Unknown"
-    instance.Realm = defaultRealm or BW.REALM_SHARED
+    instance.ID = id
+    instance.Name = id
+    instance.Realm = realm
+    instance.Require = {}
     return instance
 end
 
 function MODULE_BASE:Initialize()
-    if self.Init then self:Init() end
+    if self.Init then 
+        local success, err = pcall(self.Init, self)
+        if not success then
+            Log("error", cols.Red, "[Loader] ", cols.White, "Init error in module ", cols.Cyan, self.Name, cols.White, ":\n", err)
+        end
+    end
 end
 
 -- Loader
@@ -35,134 +41,119 @@ local function SafeInclude(filePath)
     return xpcall(include, debug_traceback, filePath)
 end
 
-local function RegisterModuleInstance(modObject, wasLoaded)
-    if not modObject or not modObject.Name then return end
+local function GetModuleInfo(fileName)
+    local nameNoExt = string_sub(fileName, 1, -5)
+    local prefix = string_sub(nameNoExt, 1, 3)
     
-    if not wasLoaded then return end
+    local realm = BW.REALM_SHARED
+    local id = nameNoExt
     
-    BW.Modules[modObject.Name] = modObject
-    Log("info", cols.White, "Module ", cols.Cyan, modObject.Name, cols.White, " registered successfully.")
+    if prefix == "sv_" then
+        realm = BW.REALM_SERVER
+        id = string_sub(nameNoExt, 4)
+    elseif prefix == "cl_" then
+        realm = BW.REALM_CLIENT
+        id = string_sub(nameNoExt, 4)
+    elseif prefix == "sh_" then
+        realm = BW.REALM_SHARED
+        id = string_sub(nameNoExt, 4)
+    end
     
-    modObject:Initialize()
+    return id, realm
 end
 
-local function ProcessModuleFile(filePath, realmType)
-    if realmType == BW.REALM_SERVER then
-        if SERVER then 
-            SafeInclude(filePath)
-            return true
-        end
-    elseif realmType == BW.REALM_CLIENT then
-        if SERVER then 
-            AddCSLuaFile(filePath)
-            return false
-        end
-        if CLIENT then 
-            SafeInclude(filePath)
-            return true
-        end
-    elseif realmType == BW.REALM_SHARED then
+local function ProcessModuleFile(filePath, realm)
+    if realm == BW.REALM_CLIENT or realm == BW.REALM_SHARED then
         if SERVER then AddCSLuaFile(filePath) end
-        SafeInclude(filePath)
-        return true
-    end
-    return false
-end
-
-local function GetRealmFromFile(filePath, defaultRealm)
-    local content = file.Read(filePath, "LUA")
-    if not content then return defaultRealm end
-    
-    local match = string_match(content, "MODULE%.Realm%s*=%s*BW%.REALM_([A-Z]+)")
-    
-    if match == "SERVER" then return BW.REALM_SERVER
-    elseif match == "CLIENT" then return BW.REALM_CLIENT
-    elseif match == "SHARED" then return BW.REALM_SHARED
     end
     
-    local numMatch = string_match(content, "MODULE%.Realm%s*=%s*(%d)")
-    if numMatch then return tonumber(numMatch) end
+    if (realm == BW.REALM_SERVER and CLIENT) or (realm == BW.REALM_CLIENT and SERVER) then
+        return true 
+    end
     
-    return defaultRealm
+    local success, err = SafeInclude(filePath)
+    if not success then
+        Log("error", cols.Red, "[Loader] Execution error in ", filePath, ":\n", err)
+        return false
+    end
+    
+    return true
 end
 
 function Loader:ScanAndLoad()
-    local files, dirs = file.Find(MODULES_PATH .. "*", "LUA")
+    local files = file.Find(MODULES_PATH .. "*.lua", "LUA")
     
-    -- Single file
     for _, fileName in ipairs(files) do
-        if string_sub(fileName, -4) ~= ".lua" then continue end
-        
-        local modName = string_sub(fileName, 1, -5)
+        local id, realm = GetModuleInfo(fileName)
         local filePath = MODULES_PATH .. fileName
         
-        local realm = GetRealmFromFile(filePath, BW.REALM_SHARED)
-        
         local oldModule = _G.MODULE
-        _G.MODULE = MODULE_BASE:New(modName, realm)
+        _G.MODULE = MODULE_BASE:New(id, realm)
         
-        local wasLoaded = ProcessModuleFile(filePath, realm)
+        if ProcessModuleFile(filePath, realm) then
+            BW.Modules[id] = _G.MODULE
+        end
         
-        RegisterModuleInstance(_G.MODULE, wasLoaded)
         _G.MODULE = oldModule
     end
-
-    -- Folder
-    for _, dirName in ipairs(dirs) do
-        if string_sub(dirName, 1, 1) == "." then continue end
+    
+    local sorted = {}
+    local visited = {}
+    local visiting = {}
+    
+    local function visitNode(modID)
+        if visiting[modID] then
+            Log("error", cols.Red, "[Loader] Circular dependency detected involving: ", modID)
+            return
+        end
+        if visited[modID] then return end
         
-        local innerPath = MODULES_PATH .. dirName .. "/"
-        local innerFiles = file.Find(innerPath .. "*.lua", "LUA")
+        visiting[modID] = true
+        local mod = BW.Modules[modID]
         
-        local oldModule = _G.MODULE
-        _G.MODULE = MODULE_BASE:New(dirName, BW.REALM_SHARED)
-        
-        local anyLoaded = false
-        
-        for _, f in ipairs(innerFiles) do
-            if f == "init.lua" or f == "sh_init.lua" then
-                local initPath = innerPath .. f
-                local initRealm = GetRealmFromFile(initPath, BW.REALM_SHARED)
-                
-                if ProcessModuleFile(initPath, initRealm) then
-                    anyLoaded = true
+        if mod and mod.Require then
+            for _, reqID in ipairs(mod.Require) do
+                if BW.Modules[reqID] then
+                    visitNode(reqID)
+                else
+                    Log("error", cols.Red, "[Loader] Missing dependency '", reqID, "' for module '", modID, "'")
                 end
-                break
-            end
-        end
-
-        for _, f in ipairs(innerFiles) do
-            if f == "init.lua" or f == "sh_init.lua" then continue end
-            
-            local filePath = innerPath .. f
-            local fileRealm = GetRealmFromFile(filePath, _G.MODULE.Realm)
-            
-            if ProcessModuleFile(filePath, fileRealm) then
-                anyLoaded = true
             end
         end
         
-        RegisterModuleInstance(_G.MODULE, anyLoaded)
-        _G.MODULE = oldModule
+        visiting[modID] = nil
+        visited[modID] = true
+        table_insert(sorted, modID)
     end
+    
+    for id, _ in pairs(BW.Modules) do
+        visitNode(id)
+    end
+    
+    local initCount = 0
+    for _, modID in ipairs(sorted) do
+        local mod = BW.Modules[modID]
+        
+        if (SERVER and mod.Realm ~= BW.REALM_CLIENT) or (CLIENT and mod.Realm ~= BW.REALM_SERVER) then
+            mod:Initialize()
+            initCount = initCount + 1
+            Log("info", cols.White, "Module ", cols.Cyan, mod.Name, cols.White, " initialized.")
+        end
+    end
+    
+    return initCount
 end
 
 function Loader:Run()
     local startTime = SysTime()
+    local envName = CLIENT and "Client" or "Server"
     
-    local function getEnvName()
-        if CLIENT then
-            return "Client"
-        end
-        return "Server"
-    end
-    Log("info", "Starting initialization of modules (" .. getEnvName() .. "-Side)...")
-    self:ScanAndLoad()
+    Log("info", "Starting initialization of modules (" .. envName .. "-Side)...")
     
-    local count = table.Count(BW.Modules)
+    local initCount = self:ScanAndLoad()
     local duration = math.Round(SysTime() - startTime, 5)
     
-    Log("success", "Loaded ", cols.Cyan, count, cols.White, " modules in ", cols.Yellow, duration, cols.White, " seconds.")
+    Log("success", "Initialized ", cols.Cyan, initCount, cols.White, " modules in ", cols.Yellow, duration, cols.White, " seconds.")
 end
 
 BW.ModuleLoader = Loader
