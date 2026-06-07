@@ -46,6 +46,12 @@ function MODULE:Init()
         end
     end)
 
+    hook.Add("PostDrawTranslucentRenderables", "BW_DrawEntInfo3D", function()
+        if MODULE and MODULE.DrawEntInfo then
+            MODULE:DrawEntInfo()
+        end
+    end)
+
     hook.Add("StartCommand", "BW_BlockInputWhenSelectorOpen", function(ply, cmd)
         if MODULE and MODULE.BlockInputWhenSelectorOpen then
             return MODULE:BlockInputWhenSelectorOpen(ply, cmd)
@@ -229,8 +235,89 @@ function MODULE:DrawHUD()
     end
 end
 
+function MODULE:DrawEntInfo()
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() then return end
+
+    local tr = ply:GetEyeTrace()
+    local ent = tr.Entity
+
+    if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() then return end
+    
+    if tr.HitPos:DistToSqr(ply:GetShootPos()) > 50^2 then return end
+
+    local ownerName = Translate("HUD.OwnerUnknown", "Unknown")
+    local nwOwner = ent:GetNWEntity("Owner")
+
+    if IsValid(nwOwner) and nwOwner:IsPlayer() then
+        ownerName = nwOwner:Nick()
+    elseif ent.CPPIGetOwner then
+        local cppiOwner = ent:CPPIGetOwner()
+        if IsValid(cppiOwner) and cppiOwner:IsPlayer() then
+            ownerName = cppiOwner:Nick()
+        end
+    end
+
+    local maxHP = ent:GetMaxHealth()
+    local currentHP = math.max(0, ent:Health())
+    local textFont = "Inter14"
+
+    local obbCenter = ent:OBBCenter()
+    local pos = ent:LocalToWorld(obbCenter)
+
+    local ang = ply:EyeAngles()
+    ang:RotateAroundAxis(ang:Up(), -90)
+    ang:RotateAroundAxis(ang:Forward(), 90)
+
+    local scale = 0.12
+
+    cam.Start3D2D(pos, ang, scale)
+        cam.IgnoreZ(true)
+
+        if maxHP > 1 then
+            local barW = 210
+            local barH = 5
+            local barX = -barW / 2
+            local barY = 0
+
+            BW.Utils.DrawProgressBar(barX, barY, barW, barH, currentHP, 0, maxHP, colors.White, colors.DarkGray)
+
+            local hpString = string.format("%i/%i", currentHP, maxHP)
+            local ownerString = string.format("%s: %s", Translate("HUD.OwnerLabel", "Owner"), BW.Utils.TruncateText(ownerName, textFont, 85))
+
+            BW.Utils.DrawShadowedText(ownerString, textFont, barX, barY - 2, colors.White, colors.Black, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+            BW.Utils.DrawShadowedText(hpString, textFont, barX + barW, barY - 2, colors.White, colors.Black, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+        else
+            local ownerString = string.format("%s: %s", Translate("HUD.OwnerLabel", "Owner"), BW.Utils.TruncateText(ownerName, textFont, 120))
+            
+            surface.SetFont(textFont)
+            local textW, textH = surface.GetTextSize(ownerString)
+            local textY = -textH / 2
+
+            BW.Utils.DrawShadowedText(ownerString, textFont, 0, textY, colors.White, colors.Black, 1, 1, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+
+            surface.SetDrawColor(colors.White.r, colors.White.g, colors.White.b, 220)
+            surface.DrawRect(-textW / 2, textY + textH + 2, textW, 1)
+
+            surface.SetDrawColor(0, 0, 0, 200)
+            surface.DrawRect(-textW / 2, textY + textH + 3, textW, 1)
+        end
+        cam.IgnoreZ(false)
+    cam.End3D2D()
+end
+
 function MODULE:WeaponSelectionDraw(ply, bind, pressed)
-    if not pressed then return end
+    if not pressed then return false end
+    
+     local isWeaponBind = bind == "+attack" 
+                      or bind == "lastinv" 
+                      or bind == "invprev" 
+                      or bind == "invnext"
+                      or string.match(bind, "^slot(%d+)$") ~= nil
+    
+    if not isWeaponBind then
+        return false
+    end
 
     if not IsValid(self.Selector) then
         self.Selector = vgui.Create("WeaponSelector")

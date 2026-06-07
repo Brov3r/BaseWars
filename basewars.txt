@@ -1,16 +1,17 @@
 "basewars"
 {
-    "base"          "sandbox"
-    "title"         "BaseWars"
-    "version"       "1.0.0"
-    "maps"		    "^bw_"
-    "category"      "other"
-    "menusystem"    "1"
+    "derived_gamemode"  "sandbox"
+    "title"             "BaseWars"
+    "version"           "1.0.0"
+    "maps"              "^bw_"
+    "category"          "pvp"
+    "menusystem"        "1"
 
-    "author_name"   "Brov3r"
-    "author_email"  ""
+    "author_name"       "Brov3r"
+    "author_email"      ""
+    "website"           ""
 
-    "icon"  ""
-    "info"  ""
-    "hide"  "0"
+    "icon"              ""
+    "info"              "Build a base, defend it, and raid your opponents."
+    "hide"              "0"
 }

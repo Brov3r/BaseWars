@@ -37,6 +37,12 @@ MODULE.Stats = {
 local PLAYER = FindMetaTable("Player")
 
 -- CUSTOM OVERRIDE
+function PLAYER:HasPrivilege()
+    if self:IsAdmin() or self:IsSuperAdmin() then return true end
+    local groupData = BW.Config and BW.Config.PlayerGroups and BW.Config.PlayerGroups[self:GetUserGroup()]
+    return groupData and groupData.Privilege == true or false
+end
+
 function PLAYER:GetMaxXP(inputLevel)
     local level = inputLevel or self:GetLevel()
     return math.floor(500 * math.pow(level, 1.5))
