@@ -88,6 +88,12 @@ BW.Lang["ru"] = {
         ["defense_and_barricades"]   = "Защита и Баррикады",
         ["interior_and_environment"] = "Интерьер и Окружение",
     },
+	Buddies = {
+		CatName = "Друзья",
+		NoPlayers = "На сервере нет других игроков!",
+		RemoveFriend = "Удалить",
+		AddFriend = "Доверять",
+	},
 	HUD = {
 		OwnerUnknown = "Неизвестно",
 		OwnerLabel = "Владелец",

@@ -42,6 +42,7 @@ function MODULE:GivePayDay(ply)
     local finalPay = math.floor(basePay * multiplier)
 
     ply:AddMoney(finalPay)
+    ply:AddXP(math.floor(finalPay / 20))
 
     local translateText = Translate("PayDay", "Salary! You have received %s%s!")
     local text = string.format(translateText, BW.Config.Economy.Currency, BW.Utils.NumWithSep(finalPay))

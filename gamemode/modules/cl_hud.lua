@@ -64,6 +64,20 @@ function MODULE:Init()
             return MODULE:WeaponSelectionDraw(ply, bind, pressed)
         end
     end)
+
+    hook.Add("PreDrawHalos", "BW_EntityHighlight", function()
+        local ply = LocalPlayer()
+        if not IsValid(ply) then return end
+        
+        local tr = ply:GetEyeTrace()
+        local ent = tr.Entity
+        
+        if IsValid(ent) and not ent:IsPlayer() and not ent:CreatedByMap() then
+            if tr.HitPos:DistToSqr(ply:GetShootPos()) < 100^2 then
+                halo.Add({ent}, BW.Config.Colors.Amber, 0.5, 0.5, 0.5, true, true )
+            end
+        end
+    end)
 end
 
 function MODULE:UpdateWeaponHistory()
