@@ -119,6 +119,9 @@ BW.Lang["ru"] = {
 	Entity = {
 		Money = "Вы подобрали %s%s!"
 	},
+	Chat = {
+		TeamText = "КОМАНДА"
+	},
 	Shop = {
 		Price = "Цена:",
 		Free = "Бесплатно",

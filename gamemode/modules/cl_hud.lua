@@ -72,7 +72,7 @@ function MODULE:Init()
         local tr = ply:GetEyeTrace()
         local ent = tr.Entity
         
-        if IsValid(ent) and not ent:IsPlayer() and not ent:CreatedByMap() then
+        if IsValid(ent) and not ent:IsPlayer() and ent:GetClass() ~= "prop_physics" and not ent:CreatedByMap() then
             if tr.HitPos:DistToSqr(ply:GetShootPos()) < 100^2 then
                 halo.Add({ent}, BW.Config.Colors.Amber, 0.5, 0.5, 0.5, true, true )
             end
