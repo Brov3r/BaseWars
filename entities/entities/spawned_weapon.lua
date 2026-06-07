@@ -5,7 +5,7 @@ ENT.Base = "base_entity"
 ENT.PrintName = "Weapon Case"
 ENT.Author = "Brov3r"
 ENT.Spawnable = false
-ENT.CanPhysGun = false
+ENT.BlockPhysGun = true 
 
 function ENT:SetupDataTables()
     self:NetworkVar("String", 0, "WeaponClass")

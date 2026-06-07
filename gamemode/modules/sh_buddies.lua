@@ -173,7 +173,7 @@ if SERVER then
         if not MODULE:PlayerCanInteract(ply, ent) then return false end
         
         if IsValid(ent) and not ent:IsPlayer() then
-            if not ent.CanPhysGun then
+            if ent.BlockPhysGun then
                 return false
             end
 

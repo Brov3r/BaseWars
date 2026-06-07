@@ -5,7 +5,7 @@ ENT.Base = "base_entity"
 ENT.PrintName = "Money"
 ENT.Author = "Brov3r"
 ENT.Spawnable = false
-ENT.CanPhysGun = false
+ENT.BlockPhysGun = true 
 
 if SERVER then
     function ENT:Initialize()
