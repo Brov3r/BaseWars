@@ -2,7 +2,7 @@ local MODULE = MODULE
 
 MODULE.Name = "Buddies"
 MODULE.Author = "Brov3r"
-MODULE.Require = { "notify" }
+MODULE.Require = { "database", "notify" }
 
 local colors = BW.Config and BW.Config.Colors or {
     White = Color(255, 255, 255),
@@ -171,8 +171,12 @@ if SERVER then
 
     hook.Add("PhysgunPickup", "BW_PP_PhysgunPickup", function(ply, ent)
         if not MODULE:PlayerCanInteract(ply, ent) then return false end
-
+        
         if IsValid(ent) and not ent:IsPlayer() then
+            if not ent.CanPhysGun then
+                return false
+            end
+
             local mins, maxs = ent:WorldSpaceAABB()
             local searchMins = mins - Vector(15, 15, 15)
             local searchMaxs = maxs + Vector(15, 15, 75)

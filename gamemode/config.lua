@@ -205,31 +205,36 @@ BW.Config = {
 	PlayerGroups = {
         ["superadmin"] = {
             PayDayMultiplier = 3.0,
+            DropMoneyMultiplier = 0.025,
 			PrefixText = "Owner",
 			PrefixIcon = "icon16/shield.png",
             Privilege = true
         },
         ["admin"] = {
             PayDayMultiplier = 2.5,
+            DropMoneyMultiplier = 0.03,
 			PrefixText = "Admin",
 			PrefixIcon = "icon16/ruby.png",
         },
         ["vip"] = {
             PayDayMultiplier = 2.0,
+            DropMoneyMultiplier = 0.05,
 			PrefixText = "VIP",
 			PrefixIcon = "icon16/star.png",
-            Privilege = true
+            Privilege = true,
         },
         ["user"] = {
             PayDayMultiplier = 1.0,
         },
     },
 	Economy = {
-		Currency 				= "$",
-		StartMoney 				= 5000,
-		PayDayInterval    		= 300,
-		PayDayDefaultMin  		= 500,
-		PayDayDefaultMax  		= 800,
-		PayDayDefaultMultiplier = 1,
+		Currency 				    = "$",
+		StartMoney 				    = 5000,
+		PayDayInterval    		    = 300,
+		PayDayDefaultMin  		    = 500,
+		PayDayDefaultMax  		    = 800,
+		PayDayDefaultMultiplier     = 1,
+        SafeMoneyAmountOnDeath      = 5000,
+        DropMoneyMultiplierDefault  = 0.1
 	},
 }

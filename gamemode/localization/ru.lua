@@ -104,6 +104,21 @@ BW.Lang["ru"] = {
     ShopItems = {
         ["money_printer_1"] = "Начальный принтер",
     },
+	Command = {
+		NoPermission = "У вас нет прав для использования этой команды.",
+		DropMoney = {
+			Hint = "Использование: /dropmoney [сумма]",
+			NoMoney = "У вас недостаточно денег!",
+			Success = "Вы выбросили %s%s!",
+		},
+		Drop = {
+			Error = "Вы не можете выбросить это оружие!",
+			Success = "Вы выбросили %s!",
+		},
+	},
+	Entity = {
+		Money = "Вы подобрали %s%s!"
+	},
 	Shop = {
 		Price = "Цена:",
 		Free = "Бесплатно",
@@ -118,5 +133,6 @@ BW.Lang["ru"] = {
 		BoughtSuccess = "Вы успешно купили:",
 	},
 	WeaponSelectorTitle = "Арсенал",
-	PayDay = "Зарплата! Вы получили %s%s!"
+	PayDay = "Зарплата! Вы получили %s%s!",
+	MoneyDropOnDeath = "Упс... Вы потеряли %s%s!"
 }
