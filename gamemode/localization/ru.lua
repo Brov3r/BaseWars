@@ -119,8 +119,13 @@ BW.Lang["ru"] = {
 	Entity = {
 		Money = "Вы подобрали %s%s!"
 	},
+	Advert = {
+		JoinText = "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Игрок</color> <color=0,255,255>%s</color> <color=255,165,0>подключился к серверу! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>, Последний визит:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>",
+		LeaveText = "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Игрок</color> <color=0,255,255>%s</color> <color=255,165,0>вышел с сервера! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>",
+	},
 	Chat = {
-		TeamText = "КОМАНДА"
+		TeamText = "КОМАНДА",
+		DeadText = "УМЕР",
 	},
 	Shop = {
 		Price = "Цена:",

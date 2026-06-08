@@ -174,7 +174,7 @@ function MODULE:DrawHUD()
         smoothHealth, 0, ply:GetMaxHealth(), colors.White, colors.DarkGray)
 
     local statsY   = healthBarY + dim.HealthBarH + 6
-    local iconSize = 16
+    local iconSize = dim.IconSize
     local spacing  = 4
     local fontName = "Inter18"
 

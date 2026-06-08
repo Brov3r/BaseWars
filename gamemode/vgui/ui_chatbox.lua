@@ -1,10 +1,10 @@
 local PANEL = {}
 
 function PANEL:Init()
-    self:SetSize(500, 250)
-    self:SetPos(10, ScrH() - 420)
-    
-    self.IsOpen = false
+	self:SetSize(BW.Config.Chat.SizeX, BW.Config.Chat.SizeY)
+    self:SetPos(BW.Config.Chat.HPosOffset, ScrH() - BW.Config.Chat.VPosOffset)
+
+	self.IsOpen = false
     self.IsTeamChat = false
     self.LastMessageTime = RealTime()
     self.MessageAlpha = 255
@@ -15,17 +15,18 @@ function PANEL:Init()
     self.Scroll = vgui.Create("DScrollPanel", self)
     self.Scroll:Dock(FILL)
     self.Scroll:DockMargin(5, 5, 5, 5)
-    
-    local vbar = self.Scroll:GetVBar()
+
+	local vbar = self.Scroll:GetVBar()
     vbar:SetWide(6)
     vbar.Paint = function() end
     vbar.btnUp.Paint = function() end
     vbar.btnDown.Paint = function() end
     vbar.btnGrip.Paint = function(s, w, h)
+		if not self.IsOpen then return end
         draw.RoundedBox(3, 0, 0, w, h, Color(128, 128, 128, self.MessageAlpha))
     end
 
-    self.InputPanel = vgui.Create("DPanel", self)
+	self.InputPanel = vgui.Create("DPanel", self)
     self.InputPanel:Dock(BOTTOM)
     self.InputPanel:SetHeight(25)
     self.InputPanel:SetPaintBackground(false)
@@ -68,6 +69,8 @@ function PANEL:Init()
                     if #self.History > 50 then table.remove(self.History, 1) end
                 end
             end
+            
+            self:UpdateScroll()
             self:CloseChat()
             return true
             
@@ -93,6 +96,136 @@ function PANEL:Init()
 	self:CloseChat()
 end
 
+function PANEL:UpdateScroll()
+    self.Scroll:GetCanvas():InvalidateLayout(true)
+    timer.Simple(0, function() 
+        if IsValid(self.Scroll) and IsValid(self.Scroll:GetVBar()) then 
+            self.Scroll:GetVBar():AnimateTo(self.Scroll:GetCanvas():GetTall(), 0.1) 
+        end
+    end)
+end
+function PANEL:HandleMessage(ply, text, isTeam, isDead)
+    self.LastMessageTime = RealTime()
+    self.MessageAlpha = 255
+    
+    local isPlayer = IsValid(ply) and ply:IsPlayer()
+    local font = "Inter18"
+
+    local iconPath = (BW.Config.Chat and BW.Config.Chat.SystemIcon) or "icon16/information.png"
+    if isPlayer then
+        local groupData = BW.Config.PlayerGroups[ply:GetUserGroup()]
+        iconPath = (groupData and groupData.PrefixIcon) and groupData.PrefixIcon or ((BW.Config.Chat and BW.Config.Chat.DefaultUserIcon) or "icon16/user.png")
+    end
+    local iconMat = Material(iconPath, "noclamp")
+
+    local mStr = string.format("<font=%s>", font)
+    mStr = mStr .. string.format("<color=97,97,97>%s •</color> ", os.date("%H:%M"))
+    
+    if isDead then mStr = mStr .. string.format("<color=255,50,50>(%s)</color> ", "DEAD") end
+    if isTeam then mStr = mStr .. string.format("<color=46,204,113>(%s)</color> ", "TEAM") end
+    
+    if isPlayer then
+        local groupData = BW.Config.PlayerGroups[ply:GetUserGroup()]
+        if groupData and groupData.PrefixText then
+            local pc = groupData.PrefixColor or color_white
+            mStr = mStr .. string.format("<color=%d,%d,%d>[%s]</color> ", pc.r, pc.g, pc.b, groupData.PrefixText)
+        end
+        local tc = team.GetColor(ply:Team()) or color_white
+        mStr = mStr .. string.format("<color=%d,%d,%d>%s:</color> ", tc.r, tc.g, tc.b, ply:Nick())
+    end
+    
+    local emojiID = 0
+	local emojisUsed = {}
+    if BW.Config.Chat.Emojis then
+        for tag, path in pairs(BW.Config.Chat.Emojis) do
+            if string.find(text, tag, 1, true) then
+                local mat = Material(path, "noclamp")
+                
+                if mat and !mat:IsError() then
+                    local id = table.Count(emojisUsed) + 1
+                    emojisUsed[id] = mat
+                    local replacement = string.format("<color=1,2,3,%d>      </color>", id)
+					text = string.Replace(text, tag, replacement)
+                end
+            end
+        end
+    end
+    
+    mStr = mStr .. "<color=255,255,255>" .. text .. "</color></font>"
+    
+    local maxWidth = self.Scroll:GetWide() > 0 and self.Scroll:GetWide() or BW.Config.Chat.SizeX
+    local parsed = markup.Parse(mStr, maxWidth - 35)
+    
+    local msgPnl = self.Scroll:Add("DPanel")
+    msgPnl:Dock(TOP)
+    msgPnl:DockMargin(0, 0, 0, 4)
+    msgPnl:SetTall(math.max(20, parsed:GetHeight() + 4))
+    
+    msgPnl.Paint = function(s, w, h)
+        if self.MessageAlpha <= 0 then return end
+        
+        surface.SetDrawColor(255, 255, 255, self.MessageAlpha)
+        surface.SetMaterial(iconMat)
+        surface.DrawTexturedRect(2, 2, 16, 16)
+        
+        if parsed and parsed.blocks then
+            for _, blk in ipairs(parsed.blocks) do
+                if not (blk.colour and blk.colour.r == 1 and blk.colour.g == 2 and blk.colour.b == 3) then
+                    if blk.text and blk.text ~= "" then
+                        surface.SetFont(blk.font)
+                        local shadowAlpha = math.Clamp(self.MessageAlpha * 0.6, 0, 150)
+                        surface.SetTextColor(0, 0, 0, shadowAlpha)
+                        surface.SetTextPos(24 + blk.offset.x + 1, 2 + blk.offset.y + 1)
+                        surface.DrawText(blk.text)
+                    end
+                end
+            end
+
+            for _, blk in ipairs(parsed.blocks) do
+                if blk.colour and blk.colour.r == 1 and blk.colour.g == 2 and blk.colour.b == 3 then
+                    local emID = blk.colour.a
+                    local emMat = emojisUsed[emID]
+                    
+                    if emMat then
+                        surface.SetDrawColor(255, 255, 255, self.MessageAlpha)
+                        surface.SetMaterial(emMat)
+                        surface.DrawTexturedRect(24 + blk.offset.x, 2 + blk.offset.y, 16, 16)
+                    end
+                else
+                    if blk.text and blk.text ~= "" then
+                        surface.SetFont(blk.font)
+                        local r, g, b = blk.colour.r, blk.colour.g, blk.colour.b
+                        local a = math.min(blk.colour.a or 255, self.MessageAlpha)
+                        
+                        surface.SetTextColor(r, g, b, a)
+                        surface.SetTextPos(24 + blk.offset.x, 2 + blk.offset.y)
+                        surface.DrawText(blk.text)
+                    end
+                end
+            end
+        end
+    end
+
+    surface.PlaySound("ambient/water/drip4.wav")
+    
+    self:UpdateScroll()
+end
+
+function PANEL:Think()
+    if self.IsOpen then
+        self.MessageAlpha = 255
+    else
+        local fadeTime = BW.Config.Chat.MessageFadeTime or 10
+        local timePassed = RealTime() - self.LastMessageTime
+        
+        if timePassed > fadeTime then
+            self.MessageAlpha = math.Clamp(255 - (timePassed - fadeTime) * 255, 0, 255)
+        else
+            self.MessageAlpha = 255
+        end
+    end
+end
+
 function PANEL:Paint(w, h)
     if self.IsOpen then
         local bg = BW.Config.Colors.DarkGray30
@@ -100,180 +233,12 @@ function PANEL:Paint(w, h)
     end
 end
 
-function PANEL:Think()
-    if self.IsOpen then
-        self.MessageAlpha = 255
-        self.InputPanel:SetVisible(true)
-        self.Scroll:SetVisible(true)
-    else
-        local timeSinceClose = RealTime() - self.LastMessageTime
-        
-        if timeSinceClose < 8 then
-            self.MessageAlpha = 255
-        elseif timeSinceClose < 10 then
-            local fadeProgress = (timeSinceClose - 8) / 2
-            self.MessageAlpha = 255 * (1 - fadeProgress)
-        else
-            self.MessageAlpha = 0
-        end
-        
-        if self.MessageAlpha <= 1 then
-            self.InputPanel:SetVisible(false)
-            self.Scroll:SetVisible(false)
-        else
-            self.Scroll:SetVisible(true)
-        end
-    end
-    
-    if IsValid(self.Scroll) and IsValid(self.Scroll:GetCanvas()) then
-        for _, row in pairs(self.Scroll:GetCanvas():GetChildren()) do
-            if row.SetMessageAlpha then
-                row:SetMessageAlpha(self.MessageAlpha)
-            end
-        end
-    end
-end
-
-function PANEL:AddMessage(iconPath, prefixText, prefixColor, args)
-    if not self.IsOpen then
-        self.LastMessageTime = RealTime()
-    end
-
-    local row = self.Scroll:Add("DPanel")
-    row:Dock(TOP)
-    row:DockMargin(2, 2, 2, 2)
-    row:SetPaintBackground(false)
-
-    row.Time = vgui.Create("DLabel", row)
-    row.Time:SetFont("Inter18")
-    row.Time:SetText(os.date("[%H:%M]"))
-    row.Time:SetTextColor(Color(0, 0, 0, 0))
-    row.Time.CustomColor = Color(150, 150, 150)
-    row.Time.Paint = function(s, w, h)
-        local text = s:GetText()
-        local font = s:GetFont()
-        local col = s.CustomColor
-        
-        if not self.IsOpen then
-            draw.SimpleText(text, font, 1, 1, Color(0, 0, 0, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        end
-        draw.SimpleText(text, font, 0, 0, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        return true
-    end
-    
-    row.Icon = vgui.Create("DImage", row)
-    row.Icon:SetSize(16, 16)
-    row.Icon:SetImage(iconPath or "icon16/information.png")
-
-    row.Prefix = vgui.Create("DLabel", row)
-    row.Prefix:SetFont("Inter18")
-    if prefixText and prefixText ~= "" then
-        row.Prefix:SetText("[" .. prefixText .. "]")
-        row.Prefix.CustomColor = prefixColor or color_white
-    else
-        row.Prefix:SetVisible(false)
-        row.Prefix.CustomColor = color_white
-    end
-    row.Prefix:SetTextColor(Color(0, 0, 0, 0))
-    row.Prefix.Paint = function(s, w, h)
-        local text = s:GetText()
-        local font = s:GetFont()
-        local col = s.CustomColor
-        
-        if not self.IsOpen then
-            draw.SimpleText(text, font, 1, 1, Color(0, 0, 0, col.a), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        end
-        draw.SimpleText(text, font, 0, 0, col, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-        return true
-    end
-
-    local strColor = "<font=Inter18>"
-    local strShadow = "<font=Inter18>"
-    local curColor = color_white
-
-    for _, v in ipairs(args) do
-        if type(v) == "table" and v.r and v.g and v.b then
-            curColor = v
-        elseif IsColor(v) then
-            curColor = v
-        elseif IsEntity(v) and v:IsPlayer() then
-            local c = team.GetColor(v:Team())
-            strColor = strColor .. string.format("<color=%d,%d,%d>%s</color>", c.r, c.g, c.b, v:Nick())
-            strShadow = strShadow .. string.format("<color=0,0,0>%s</color>", v:Nick())
-        else
-            local safeText = tostring(v):gsub("<", "&lt;"):gsub(">", "&gt;")
-            strColor = strColor .. string.format("<color=%d,%d,%d>%s</color>", curColor.r, curColor.g, curColor.b, safeText)
-            strShadow = strShadow .. string.format("<color=0,0,0>%s</color>", safeText)
-        end
-    end
-    strColor = strColor .. "</font>"
-    strShadow = strShadow .. "</font>"
-
-    row.MarkupObj = markup.Parse(strColor, 350) 
-    row.MarkupShadow = markup.Parse(strShadow, 350)
-
-    row.TextPanel = vgui.Create("DPanel", row)
-    row.TextPanel.Paint = function(s, w, h)
-        if not self.IsOpen and row.MarkupShadow then
-            row.MarkupShadow:Draw(1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, self.MessageAlpha)
-        end
-        if row.MarkupObj then
-            row.MarkupObj:Draw(0, 0, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP, self.MessageAlpha)
-        end
-    end
-
-    row.PerformLayout = function(s, w, h)
-        local left = 4
-        local firstLineH = 20
-        
-        s.Time:SizeToContents()
-        s.Time:SetPos(left, (firstLineH - s.Time:GetTall()) / 2)
-        left = left + s.Time:GetWide() + 6
-        
-        s.Icon:SetPos(left, (firstLineH - 16) / 2)
-        left = left + 16 + 6
-        
-        if s.Prefix:IsVisible() then
-            s.Prefix:SizeToContents()
-            s.Prefix:SetPos(left, (firstLineH - s.Prefix:GetTall()) / 2)
-            left = left + s.Prefix:GetWide() + 4
-        end
-        
-        local textSpace = w - left - 10
-        if s.LastW ~= textSpace then
-            row.MarkupObj = markup.Parse(strColor, textSpace)
-            row.MarkupShadow = markup.Parse(strShadow, textSpace)
-            s.LastW = textSpace
-        end
-
-        s.TextPanel:SetPos(left, 2)
-        s.TextPanel:SetSize(textSpace, row.MarkupObj:GetHeight())
-        
-        local calculatedHeight = math.max(20, s.TextPanel:GetTall() + 4)
-        if s:GetTall() ~= calculatedHeight then
-            s:SetHeight(calculatedHeight)
-            self.Scroll:GetCanvas():InvalidateLayout()
-        end
-    end
-
-    function row:SetMessageAlpha(alpha)
-        local a = math.Clamp(alpha, 0, 255)
-        self.Time.CustomColor.a = a
-        self.Prefix.CustomColor.a = a
-        self.Icon:SetAlpha(a)
-    end
-
-    timer.Simple(0.05, function()
-        if IsValid(self) and IsValid(self.Scroll) and IsValid(self.Scroll:GetVBar()) then
-            self.Scroll:GetVBar():AnimateTo(self.Scroll:GetCanvas():GetTall(), 0.1, 0, -1)
-        end
-    end)
-end
-
 function PANEL:OpenChat(isTeam)
     self.IsOpen = true
     self.IsTeamChat = isTeam 
     self.HistoryPos = #self.History + 1
+    
+    self:SetSize(BW.Config.Chat.SizeX, BW.Config.Chat.SizeY)
     
     self:SetVisible(true)
     self:SetMouseInputEnabled(true)
@@ -293,13 +258,15 @@ function PANEL:OpenChat(isTeam)
     end
     
     self.InputPanel:InvalidateLayout(true)
-    
     self.Entry:RequestFocus()
+    self:UpdateScroll()
 end
 
 function PANEL:CloseChat()
     self.IsOpen = false
     self.LastMessageTime = RealTime() 
+    
+    self:SetSize(BW.Config.Chat.SizeX, BW.Config.Chat.SizeY - 25)
     
     self.Entry:SetText("")
     self.InputPanel:SetVisible(false)
@@ -307,7 +274,7 @@ function PANEL:CloseChat()
     
     self:SetKeyboardInputEnabled(false)
     self:SetMouseInputEnabled(false)
-    -- gui.EnableScreenClicker(false) 
+    gui.EnableScreenClicker(false) 
 end
 
 vgui.Register("ChatBox", PANEL, "EditablePanel")

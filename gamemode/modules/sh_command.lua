@@ -46,6 +46,15 @@ function MODULE:Init()
 end
 
 function MODULE:RegisterDefaultCommands()
+	self:AddCommand("botsay", function(ply, args)
+        local text = table.concat(args, " ")
+        if text == "" then return end
+
+        for _, bot in ipairs(player.GetBots()) do
+            bot:Say(text)
+        end
+    end, "Forces all bots to say a message", true)
+	
 	self:AddCommand("drop", function(ply, args)
 		local activeWep = ply:GetActiveWeapon()
 

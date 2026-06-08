@@ -61,10 +61,41 @@ BW.Config = {
             HealthBarW   	= 200,
             ArmorBarH    	= 8,
             ArmorBarW    	= 200,
+            IconSize        = 16,
         },
         Margin              = 10,
         AvatarCornerOffset  = 20,
         AnimTime            = 0.2,
+    },
+    Chat = {
+        VPosOffset = 420,
+        HPosOffset = 10,
+        SizeX = 600,
+        SizeY = 250,
+        MessageFadeTime = 10,
+        SystemIcon = "icon16/information.png",
+        DefaultUserIcon = "icon16/user.png",
+        Emojis = {
+            [":smile:"]   = "icon16/emoticon_smile.png",   [":grin:"]    = "icon16/emoticon_grin.png",
+            [":wink:"]    = "icon16/emoticon_wink.png",    [":tongue:"]  = "icon16/emoticon_tongue.png",
+            [":happy:"]   = "icon16/emoticon_happy.png",   [":surprised:"] = "icon16/emoticon_surprised.png",
+            [":sad:"]     = "icon16/emoticon_unhappy.png",
+
+            [":thumbup:"] = "icon16/thumb_up.png",         [":thumbdown:"] = "icon16/thumb_down.png",
+            [":mail:"]    = "icon16/email.png",
+
+            [":heart:"]   = "icon16/heart.png",            [":star:"]    = "icon16/star.png",
+            [":light:"]   = "icon16/lightbulb.png",        [":money:"]   = "icon16/money.png",
+            [":clock:"]   = "icon16/time.png",             [":lock:"]    = "icon16/lock.png",
+
+            [":ok:"]      = "icon16/accept.png",           [":no:"]      = "icon16/cross.png",
+            [":info:"]    = "icon16/information.png",      [":warn:"]    = "icon16/exclamation.png",
+            [":user:"]    = "icon16/user.png",             [":shield:"]  = "icon16/shield.png",
+            [":bug:"]     = "icon16/bug.png",              [":wrench:"]  = "icon16/wrench.png"
+        },
+    },
+    Advert = {
+        DelayTime = 180,
     },
     Team = {
         MaxPlayers = 5,

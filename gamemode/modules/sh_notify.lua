@@ -246,6 +246,6 @@ function MODULE:AddNotification(notifType, text, duration)
         table.remove(self.notifications)
     end
 
-    surface.PlaySound("HL1/fvox/blip.wav")
+    surface.PlaySound("ambient/water/drip1.wav")
     if Log then Log(typeData.logLevel, "[Notify]", text) end
 end
