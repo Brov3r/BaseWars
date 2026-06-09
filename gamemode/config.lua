@@ -73,6 +73,9 @@ BW.Config = {
         SizeX = 600,
         SizeY = 250,
         MessageFadeTime = 10,
+        MaxMessageHistory = 100,
+        MaxMessageLenght = 1000,
+        VoiceDistance = 500,
         SystemIcon = "icon16/information.png",
         DefaultUserIcon = "icon16/user.png",
         Emojis = {
@@ -95,7 +98,8 @@ BW.Config = {
         },
     },
     Advert = {
-        DelayTime = 180,
+        DelayTime = 240,
+        MessageMaxIndex = 3,
     },
     Team = {
         MaxPlayers = 5,

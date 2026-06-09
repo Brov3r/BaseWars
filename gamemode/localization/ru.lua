@@ -106,10 +106,18 @@ BW.Lang["ru"] = {
     },
 	Command = {
 		NoPermission = "У вас нет прав для использования этой команды.",
+		Cooldown = "Подождите %s сек. перед повторным использованием.",
 		DropMoney = {
 			Hint = "Использование: /dropmoney [сумма]",
 			NoMoney = "У вас недостаточно денег!",
 			Success = "Вы выбросили %s%s!",
+		},
+		Report = {
+			Hint = "Использование: /report [текст]",
+			TooLong = "Ваше сообщение слишком длинное! Не более 500 символов!",
+			DbError = "При отправке сообщения произошла ошибка. Попробуйте еще раз позже.",
+			Success = "Ваше сообщение было успешно отправлено администраторам!",
+			AdminMsg = "<#5FF05F>[REPORT] <#FFA500>Игрок <#00FFFF>%s <#FFA500>(<#00FFFF>%s<#FFA500>) отправил репорт: <#00FFFF>%s",
 		},
 		Drop = {
 			Error = "Вы не можете выбросить это оружие!",
@@ -120,8 +128,13 @@ BW.Lang["ru"] = {
 		Money = "Вы подобрали %s%s!"
 	},
 	Advert = {
-		JoinText = "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Игрок</color> <color=0,255,255>%s</color> <color=255,165,0>подключился к серверу! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>, Последний визит:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>",
-		LeaveText = "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Игрок</color> <color=0,255,255>%s</color> <color=255,165,0>вышел с сервера! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>",
+		JoinText = "<#5FF05F>[BaseWars] <#FFA500>Игрок <#00FFFF>%s <#FFA500>подключился к серверу! (SteamID: <#00FFFF>%s<#FFA500>)",
+		LeaveText = "<#5FF05F>[BaseWars] <#FFA500>Игрок <#00FFFF>%s <#FFA500>вышел с сервера! (SteamID: <#00FFFF>%s<#FFA500>)",
+		DelayMsg = {
+			Msg1 = "<#5FF05F>[BaseWars] <#FFA500>Сервер активно развивается. Если заметили ошибку или есть предложение по улучшению - <#00FFFF>/report",
+			Msg2 = "<#5FF05F>[BaseWars] <#FFA500>Пожалуйста, если Вы не знакомы с данным режимом, прочтите FAQ и правила - <#00FFFF>Q<#FFA500>-<#00FFFF>Правила <#FFA500>(или <#00FFFF>FAQ<#FFA500>)",
+			Msg3 = "<#5FF05F>[BaseWars] <#FFA500>Приглашайте друзей - вместе веселей!",
+		}
 	},
 	Chat = {
 		TeamText = "КОМАНДА",

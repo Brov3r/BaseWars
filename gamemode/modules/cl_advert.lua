@@ -2,34 +2,36 @@ local MODULE = MODULE
 
 MODULE.Name = "Advert"
 MODULE.Author = "Brov3r"
-MODULE.Require = { "database", "chat" }
+MODULE.Require = {}
+
 
 function MODULE:Init()
-	-- timer.Create("BW_Advert", BW.Config.Advert.DelayTime, 0, function()
-	-- 	chat.AddText(Color(255, 255, 255), "[Ads] ")
-	-- end)
+    local currentAdvertIndex = 1
 
-	gameevent.Listen( "player_connect" )
-	hook.Add("player_connect", "BW_PlayerConnect", function(data)
-		local lastSeen = player.GetByID(data.index):GetLastSeen()
-		local humanReadable = os.date("%d.%m.%Y - %H:%M", SysTime())
-		if lastSeen and lastSeen > 0 then
-            humanReadable = os.date("%d.%m.%Y - %H:%M", lastSeen)
-        end
-		chat.AddText(string.format(
-			Translate("Advert.JoinText", "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Player</color> <color=0,255,255>%s</color> <color=255,165,0>connected to the server! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>, last session:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>"),
-			data.name,
-			data.networkid,
-			humanReadable
-		))
+	timer.Create("BW_Advert", BW.Config.Advert.DelayTime, 0, function()
+		local text = Translate("Advert.DelayMsg.Msg" .. currentAdvertIndex, "")
+		
+		if text and text ~= "" then
+			chat.AddText(text)
+		end
+		
+		currentAdvertIndex = currentAdvertIndex + 1
+		if currentAdvertIndex > BW.Config.Advert.MessageMaxIndex then
+			currentAdvertIndex = 1
+		end
 	end)
 
-	gameevent.Listen( "player_disconnect" )
-	hook.Add("player_disconnect", "BW_PlayerDisconnect", function(data)
-		chat.AddText(string.format(
-			Translate("Advert.LeaveText", "<color=95,250,95>[BaseWars]</color> <color=255,165,0>Player</color> <color=0,255,255>%s</color> <color=255,165,0>leave from the server! (SteamID:</color> <color=0,255,255>%s</color><color=255,165,0>)</color>"),
-			data.name,
-			data.networkid
-		))
-	end)
+    gameevent.Listen( "player_connect" )
+    hook.Add("player_connect", "BW_PlayerConnect", function(data)
+        local translatedStr = Translate("Advert.JoinText", "<#5FF05F>[BaseWars] <#FFA500>Player <#00FFFF>%s <#FFA500>connected to the server! (SteamID: <#00FFFF>%s<#FFA500>)")
+        local formattedStr = string.format(translatedStr, data.name, data.networkid)
+        chat.AddText(formattedStr)
+    end)
+
+    gameevent.Listen( "player_disconnect" )
+    hook.Add("player_disconnect", "BW_PlayerDisconnect", function(data)
+        local translatedStr = Translate("Advert.LeaveText", "<#5FF05F>[BaseWars] <#FFA500>Player <#00FFFF>%s <#FFA500>leave from the server! (SteamID: <#00FFFF>%s<#FFA500>)")
+        local formattedStr = string.format(translatedStr, data.name, data.networkid)
+        chat.AddText(formattedStr)
+    end)
 end
