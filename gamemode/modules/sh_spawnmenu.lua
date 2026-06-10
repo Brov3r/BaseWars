@@ -365,7 +365,9 @@ function MODULE:RegisterSpawnMenuHooks()
 
         local customTabs = {
             {name = Translate("SpawnMenu.PropsTabName", "Props"), class = "BW_SpawnMenu_Props", icon = "icon16/box.png", isDefault = true},
-            {name = Translate("SpawnMenu.ShopTabName", "Shop"),   class = "BW_SpawnMenu_Shop",  icon = "icon16/money.png"}
+            {name = Translate("SpawnMenu.ShopTabName", "Shop"),   class = "BW_SpawnMenu_Shop",  icon = "icon16/money.png"},
+            {name = Translate("SpawnMenu.RulesTabName", "Rules"),   class = "BW_SpawnMenu_Rules",  icon = "icon16/information.png"},
+            {name = Translate("SpawnMenu.FAQTabName", "FAQ"),   class = "BW_SpawnMenu_FAQ",  icon = "icon16/star.png"},
         }
 
         local defaultSheet = nil
