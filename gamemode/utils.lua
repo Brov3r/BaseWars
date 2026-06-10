@@ -148,6 +148,8 @@ function BW.Utils.SmoothValue(stateKey, targetValue, animTime)
 end
 
 function BW.Utils.TruncateText(text, font, maxWidth)
+    text = tostring(text or "")
+    
     if not maxWidth or maxWidth <= 0 then return text end
     
     local cacheKey = text .. font .. maxWidth

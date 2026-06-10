@@ -7,30 +7,30 @@ MODULE.Require = {}
 MODULE.DataBaseName = "bw_accounts"
 MODULE.Stats = {
     -- === Economy ===
-    Money			= { default = function() return (BW.Config and BW.Config.Economy and BW.Config.Economy.StartMoney) or 5000 end, type = "Int" },
-	Level			= { default = 1, type = "Int" },
-	XP				= { default = 0, type = "Int" },
-	RecoveryBalance = { default = 0, type = "Int", changeLog = false },
-	LifetimeEarned  = { default = 0, type = "Int", methods = { has = false }, changeLog = false },
-	LifetimeSpent   = { default = 0, type = "Int", methods = { has = false }, changeLog = false },
+    Money			= { default = function() return (BW.Config and BW.Config.Economy and BW.Config.Economy.StartMoney) or 5000 end, type = "Int", min = 0 },
+	Level			= { default = 1, type = "Int", max = 100, min = 0 },
+	XP				= { default = 0, type = "Int", min = 0 },
+	RecoveryBalance = { default = 0, type = "Int", changeLog = false, min = 0 },
+	LifetimeEarned  = { default = 0, type = "Int", methods = { has = false }, changeLog = false, min = 0 },
+	LifetimeSpent   = { default = 0, type = "Int", methods = { has = false }, changeLog = false, min = 0 },
 
 	-- === Raid ===
-	RaidAttacks		= { default = 0, type = "Int" },
-	RaidDefenses	= { default = 0, type = "Int" },
+	RaidAttacks		= { default = 0, type = "Int", min = 0 },
+	RaidDefenses	= { default = 0, type = "Int", min = 0 },
 
 	-- === PVP ===
-	Kills			= { default = 0, type = "Int" },
-	Deaths			= { default = 0, type = "Int" },
-	Bounty			= { default = 0, type = "Int" },
+	Kills			= { default = 0, type = "Int", min = 0 },
+	Deaths			= { default = 0, type = "Int", min = 0 },
+	Bounty			= { default = 0, type = "Int", min = 0 },
 
 	-- === Social ===
-	Reputation		= { default = 0, type = "Int", methods = { has = false } },
+	Reputation		= { default = 0, type = "Int", max = 100, min = -100, methods = { has = false } },
 		
 	-- === Account ===
-	PlayTime		= { default = 0, type = "Int", changeLog = false },
+	PlayTime		= { default = 0, type = "Int", changeLog = false, min = 0 },
 	CreatedAt		= { default = 0, type = "Timestamp", methods = { set = false, add = false, take = false, has = false }, changeLog = false },
 	LastSeen		= { default = 0, type = "Timestamp", methods = { set = false, add = false, take = false, has = false }, changeLog = false },
-	LoginCount		= { default = 0, type = "Int", methods = { set = false, add = false, take = false, has = false }, changeLog = false },
+	LoginCount		= { default = 0, type = "Int", methods = { set = false, add = false, take = false, has = false }, changeLog = false, min = 0 },
 	DonateUntil		= { default = 0, type = "Timestamp", methods = { has = false } }
 }
 
@@ -107,6 +107,20 @@ function MODULE:Init()
         if SERVER then
             if methods.set ~= false then
                 PLAYER["Set" .. key] = function(ply, value, silent)
+                    if statType == "Int" or statType == "Float" then
+                        value = tonumber(value) or 0
+
+                        local minVal = data.min
+                        local maxVal = data.max
+
+                        if type(maxVal) == "function" then maxVal = maxVal(ply) end
+                        if type(minVal) == "function" then minVal = minVal(ply) end
+
+                        if minVal or maxVal then
+                            value = math.Clamp(value, minVal or -9007199254740991, maxVal or 9007199254740991)
+                        end
+                    end
+
                     if ply["PreSet" .. key] then
                         local overrideVal, cancel = ply["PreSet" .. key](ply, value)
                         if cancel then return end
@@ -156,9 +170,9 @@ function MODULE:Init()
                     amount = tonumber(amount) or 0
                     if amount <= 0 then return end
                     if ply["Set" .. key] then
-                        ply["Set" .. key](ply, math.max(ply["Get" .. key](ply) - amount, 0))
+                        ply["Set" .. key](ply, ply["Get" .. key](ply) - amount, 0)
                     else
-                        local val = math.max(ply["Get" .. key](ply) - amount, 0)
+                        local val = ply["Get" .. key](ply) - amount
                         ply[setFunc](ply, key, val)
                         ply:MarkStatDirty(key)
                     end

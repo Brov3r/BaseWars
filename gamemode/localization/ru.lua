@@ -97,6 +97,7 @@ BW.Lang["ru"] = {
 	HUD = {
 		OwnerUnknown = "Неизвестно",
 		OwnerLabel = "Владелец",
+		WorldText = "Мир"
 	},
 	ShopCategory = {
         ["cat_1"]       = "Денежные принтеры",

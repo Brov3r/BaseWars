@@ -7,6 +7,10 @@ ENT.Author = "Brov3r"
 ENT.Spawnable = false
 ENT.BlockPhysGun = true 
 
+function ENT:SetupDataTables()
+    self:NetworkVar("Int", 0, "Amount")
+end
+
 if SERVER then
     function ENT:Initialize()
         self:SetModel("models/props/cs_assault/money.mdl")
@@ -21,7 +25,7 @@ if SERVER then
         
         maxs.z = maxs.z * 5.5
         mins.z = mins.z * 5.5
-		
+        
         self:PhysicsInitBox(mins, maxs)
         
         local phys = self:GetPhysicsObject()
@@ -29,10 +33,6 @@ if SERVER then
             phys:Wake()
             phys:EnableMotion(true)
         end
-    end
-
-    function ENT:SetupDataTables()
-        self:NetworkVar("Int", 0, "Amount")
     end
 
     function ENT:Use(activator)
@@ -46,15 +46,21 @@ if SERVER then
         end
     end
 else
+    local moneyColor = Color(76, 175, 80, 255)
 
     function ENT:Initialize()
-        self:SetColor(Color(76, 175, 80, 255))
-    
         local mat = Matrix()
-        mat:Scale(Vector(1, 1, 5.5)) -- Вот здесь можно менять оси отдельно
+        mat:Scale(Vector(1, 1, 5.5))
         self:EnableMatrix("RenderMultiply", mat)
     end
+
     function ENT:Draw()
+        render.SetColorModulation(moneyColor.r / 255, moneyColor.g / 255, moneyColor.b / 255)
+        render.SetBlend(moneyColor.a / 255)
+        
         self:DrawModel() 
+        
+        render.SetColorModulation(1, 1, 1)
+        render.SetBlend(1)
     end
 end

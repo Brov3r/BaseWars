@@ -5,7 +5,9 @@ MODULE.Author = "Brov3r"
 MODULE.Require = { "database" }
 
 local lvlIcon = Material("icon16/award_star_gold_3.png")
-local repIcon = Material("icon16/heart.png")
+local iconRepUp   = Material("icon16/thumb_up.png")
+local iconRepDown = Material("icon16/thumb_down.png")
+local iconRepZero = Material("icon16/heart.png")
 local config   = BW.Config
 local hud      = config.HUD
 local colors   = config.Colors
@@ -194,6 +196,13 @@ function MODULE:DrawHUD()
     local rightEdge  = barX + barW
     local repW, _    = surface.GetTextSize(repStr)
 
+    local repIcon = iconRepZero
+    if currentRep > 0 then
+        repIcon = iconRepUp
+    elseif currentRep < 0 then
+        repIcon = iconRepDown
+    end
+    
     surface.SetMaterial(repIcon)
     surface.SetDrawColor(255, 255, 255, 255)
     surface.DrawTexturedRect(rightEdge - repW - spacing - iconSize, statsY, iconSize, iconSize)
@@ -258,26 +267,39 @@ function MODULE:DrawEntInfo()
 
     if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() then return end
     
-    if tr.HitPos:DistToSqr(ply:GetShootPos()) > 50^2 then return end
+    if tr.HitPos:DistToSqr(ply:GetShootPos()) > BW.Config.HUD.DrawEntInfoDistance ^2 then return end
 
     local ownerName = Translate("HUD.OwnerUnknown", "Unknown")
-    local nwOwner = ent:GetNWEntity("Owner")
 
-    if IsValid(nwOwner) and nwOwner:IsPlayer() then
-        ownerName = nwOwner:Nick()
+    if CPPI and CPPI.GetName() == "Warden" then
+        ownerName = ent:WardenGetOwnerName()
+        if ent:WardenGetOwnerID() == "World" then
+            ownerName = Translate("HUD.WorldText", "World")
+        end
     elseif ent.CPPIGetOwner then
         local cppiOwner = ent:CPPIGetOwner()
         if IsValid(cppiOwner) and cppiOwner:IsPlayer() then
             ownerName = cppiOwner:Nick()
         end
+    elseif IsValid(ent.Owner) then
+        ownerName = ent.Owner:Nick()
     end
 
     local maxHP = ent:GetMaxHealth()
     local currentHP = math.max(0, ent:Health())
     local textFont = "Inter14"
 
+    local obbMins, obbMaxs = ent:OBBMins(), ent:OBBMaxs()
+    local height = obbMaxs.z - obbMins.z
+    
+    local isSmall = height < 25 
+
     local obbCenter = ent:OBBCenter()
     local pos = ent:LocalToWorld(obbCenter)
+
+    if isSmall then
+        pos = pos + Vector(0, 0, (height / 2) + 5)
+    end
 
     local ang = ply:EyeAngles()
     ang:RotateAroundAxis(ang:Up(), -90)
@@ -306,6 +328,7 @@ function MODULE:DrawEntInfo()
             
             surface.SetFont(textFont)
             local textW, textH = surface.GetTextSize(ownerString)
+            
             local textY = -textH / 2
 
             BW.Utils.DrawShadowedText(ownerString, textFont, 0, textY, colors.White, colors.Black, 1, 1, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
@@ -321,16 +344,16 @@ function MODULE:DrawEntInfo()
 end
 
 function MODULE:WeaponSelectionDraw(ply, bind, pressed)
-    if not pressed then return false end
+    if not pressed then return end
     
-     local isWeaponBind = bind == "+attack" 
+    local isWeaponBind = bind == "+attack" 
                       or bind == "lastinv" 
                       or bind == "invprev" 
                       or bind == "invnext"
                       or string.match(bind, "^slot(%d+)$") ~= nil
     
     if not isWeaponBind then
-        return false
+        return
     end
 
     if not IsValid(self.Selector) then
@@ -340,7 +363,7 @@ function MODULE:WeaponSelectionDraw(ply, bind, pressed)
     local isSelectorOpen = IsValid(self.Selector) and (self.Selector.TargetAlpha or 0) > 0
 
     if not isSelectorOpen and (ply:KeyDown(IN_ATTACK) or ply:KeyDown(IN_ATTACK2)) then
-        return false
+        return
     end
 
     if bind == "+attack" and isSelectorOpen then
@@ -408,7 +431,7 @@ function MODULE:WeaponSelectionDraw(ply, bind, pressed)
         return true 
     end
 
-    return false
+    return
 end
 
 function MODULE:BlockInputWhenSelectorOpen(ply, cmd)

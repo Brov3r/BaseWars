@@ -9,7 +9,9 @@ local colors     = config.Colors
 local nameTagCfg = config.NameTag
 
 local lvlIcon = Material("icon16/award_star_gold_3.png")
-local repIcon = Material("icon16/heart.png")
+local iconRepUp   = Material("icon16/thumb_up.png")
+local iconRepDown = Material("icon16/thumb_down.png")
+local iconRepZero = Material("icon16/heart.png")
 
 function MODULE:Init()
     hook.Add("HUDDrawTargetID", "BW_HideDefaultTargetID", function()
@@ -126,6 +128,12 @@ function MODULE:DrawOverheadName(ply)
         )
 
         local repX = startX + iconSize + iconTextGap + lvlW + blockGap
+        local repIcon = iconRepZero
+        if rep > 0 then
+            repIcon = iconRepUp
+        elseif rep < 0 then
+            repIcon = iconRepDown
+        end
         
         surface.SetMaterial(repIcon)
         surface.SetDrawColor(255, 255, 255, currentAlpha)

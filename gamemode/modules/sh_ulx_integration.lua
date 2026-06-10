@@ -565,7 +565,7 @@ function MODULE:AddCommands()
             local v = target_plys[i]
             if IsValid(v) then
                 local current = v:GetKills() or 0
-                local new_amt = math.max(0, current - amt)
+                local new_amt = current - amt
                 v:SetKills(new_amt)
                 ulx.fancyLogAdmin(calling_ply, "#A took #i kills from #T (Total Kills: #i)", amt, v, new_amt)
             end
@@ -599,7 +599,7 @@ function MODULE:AddCommands()
             local v = target_plys[i]
             if IsValid(v) then
                 local current = v:GetDeaths() or 0
-                local new_amt = math.max(0, current - amt) -- Не даем уйти в минус
+                local new_amt = current - amt -- Не даем уйти в минус
                 v:SetDeaths(new_amt)
                 ulx.fancyLogAdmin(calling_ply, "#A took #i deaths from #T (Total Deaths: #i)", amt, v, new_amt)
             end

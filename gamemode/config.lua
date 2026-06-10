@@ -66,6 +66,7 @@ BW.Config = {
         Margin              = 10,
         AvatarCornerOffset  = 20,
         AnimTime            = 0.2,
+        DrawEntInfoDistance = 100,
     },
     Chat = {
         VPosOffset = 420,
@@ -116,14 +117,19 @@ BW.Config = {
         JumpPower           = 200
     },
 	AllowedTools = {
-        ["weld"]        = true,
-        ["button"]      = true,
-        ["lamp"]        = true,
-        ["nocollide"]   = true,
-        ["camera"]      = true,
-        ["colour"]      = true,
-        ["material"]    = true,
-        ["remover"]     = true
+        ["weld"]                = true,
+        ["button"]              = true,
+        ["lamp"]                = true,
+        ["nocollide"]           = true,
+        ["camera"]              = true,
+        ["colour"]              = true,
+        ["material"]            = true,
+        ["remover"]             = true,
+        ["precision"]           = true,
+        ["textscreen"]          = true,
+        ["keypad"]              = true,
+        ["stacker_improved"]    = true,
+        ["fading_door"]         = true
     },
 	PlayerLoadout = {
         "weapon_physcannon",
