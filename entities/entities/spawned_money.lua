@@ -26,7 +26,7 @@ if SERVER then
         maxs.z = maxs.z * 5.5
         mins.z = mins.z * 5.5
         
-        self:PhysicsInitBox(mins, maxs)
+        self:SetCollisionBounds(mins, maxs)
         
         local phys = self:GetPhysicsObject()
         if IsValid(phys) then

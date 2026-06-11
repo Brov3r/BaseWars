@@ -344,7 +344,7 @@ function MODULE:DrawEntInfo()
 end
 
 function MODULE:WeaponSelectionDraw(ply, bind, pressed)
-    if not pressed then return end
+    if not pressed or not ply:Alive() then return end
     
     local isWeaponBind = bind == "+attack" 
                       or bind == "lastinv" 

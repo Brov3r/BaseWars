@@ -128,6 +128,8 @@ function MODULE:InitServer()
         undo.Finish("Prop (" .. model:match("([^/]+)%.mdl$") .. ")")
 
         Log("success", "Player ", BW.Config.Colors.Cyan, ply:Nick(), BW.Config.Colors.White, " spawn prop ", BW.Config.Colors.Cyan, model, BW.Config.Colors.White, " with HP: ", BW.Config.Colors.Green, tostring(propHP) .. " HP")
+    
+        hook.Call("PlayerSpawnedProp", nil, ply, model, ent)
     end)
 
     net.Receive("BW_BuyShopItem", function(len, ply)
@@ -260,6 +262,8 @@ function MODULE:InitServer()
             local itemNameTranslated = Translate("ShopItems." .. itemID, itemID)
             ply:Notify(NOTIFY_SUCCESS or 0, Translate("Shop.BoughtSuccess", "You have successfully purchased:") .. " " .. itemNameTranslated, 5)
         end
+
+        hook.Call("PlayerSpawnedSENT", nil, ply, ent)
     end)
         
     hook.Add("CanTool", "BW_BlockForbiddenTools", function(ply, tr, toolName, tool, button)

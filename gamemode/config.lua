@@ -103,6 +103,9 @@ BW.Config = {
         UnghostDelay = 1,
         CheckInterval = 0.5,
         SpawnRadiusSqr = 100 ^ 2,
+        MoneyForceProtection = 50000,
+        TimeProtection = 120,
+        ProtectionMat = "models/props_combine/com_shield001a"
     },
     Advert = {
         DelayTime = 240,
