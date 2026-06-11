@@ -31,7 +31,6 @@ function PANEL:UpdateWeapons()
         if classA == "weapon_physgun" then return true end
         if classB == "weapon_physgun" then return false end
 
-        -- Безопасный вызов GetSlot
         local slotA = (a.GetSlot and a:GetSlot()) or 0
         local slotB = (b.GetSlot and b:GetSlot()) or 0
         

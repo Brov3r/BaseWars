@@ -33,7 +33,9 @@ function GM:PlayerLoadout( ply )
 end
 
 function GM:PlayerDeath(victim, inflictor, attacker)
-   if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim then
+    self.BaseClass.PlayerDeath(self, victim, inflictor, attacker)
+
+    if IsValid(attacker) and attacker:IsPlayer() and attacker ~= victim then
         attacker:AddKills(1)
     end
 
@@ -100,6 +102,8 @@ function GM:PlayerDeath(victim, inflictor, attacker)
 end
 
 function GM:SetupMove(ply, mv, cmd)
+    self.BaseClass:SetupMove(ply, mv, cmd)
+    
     if BW.Config.Motion.EnableBHop and ply:IsOnGround() and cmd:KeyDown(IN_JUMP) then
         local vel = ply:GetVelocity()
         local jumpPower = BW.Config.Motion.JumpPower or 200
@@ -108,6 +112,4 @@ function GM:SetupMove(ply, mv, cmd)
         ply:SetGroundEntity(NULL)
         cmd:RemoveKey(IN_JUMP)
     end
-
-    self.BaseClass:SetupMove(ply, mv, cmd)
 end

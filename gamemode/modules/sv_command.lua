@@ -183,14 +183,13 @@ function MODULE:RegisterDefaultCommands()
         if ammoType ~= -1 then
             ply:RemoveAmmo(ammo, ammoType)
         end
+
         ply:StripWeapon(wepClass)
 
         local phys = ent:GetPhysicsObject()
         if IsValid(phys) then
             phys:ApplyForceCenter(ply:GetAimVector() * 300)
         end
-
-        ply:Notify(NOTIFY_SUCCESS, string.format(Translate("Command.Drop.Success", "You've thrown away %s!"), Translate("Weapons."..wepClass, Translate(wepClass, activeWep:GetPrintName()))), 5)
     end, "Throw the weapon on the floor", false, 3)
 
    self:AddCommand("dropmoney", function(ply, args)

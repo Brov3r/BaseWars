@@ -15,6 +15,7 @@ local animTime = hud.AnimTime
 local margin   = hud.Margin
 local dim      = hud.Dimensions
 
+
 local HiddenElementsLookup = {
     ["CHudHealth"] = true, 
     ["CHudBattery"] = true, 
@@ -34,10 +35,9 @@ function MODULE:Init()
 
     self.CurrentWeapon = nil
     self.LastWeapon = nil
-
     self.LastW = 0
     self.LastH = 0
-    
+        
     hook.Add("HUDShouldDraw", "BW_HideElements", function(name)
         if HiddenElementsLookup[name] then return false end
     end)

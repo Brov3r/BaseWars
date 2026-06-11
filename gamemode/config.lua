@@ -98,6 +98,12 @@ BW.Config = {
             [":bug:"]     = "icon16/bug.png",              [":wrench:"]  = "icon16/wrench.png"
         },
     },
+    Protection = {
+        GhostColor = Color(255, 255, 255, 150),
+        UnghostDelay = 1,
+        CheckInterval = 0.5,
+        SpawnRadiusSqr = 100 ^ 2,
+    },
     Advert = {
         DelayTime = 240,
         MessageMaxIndex = 3,

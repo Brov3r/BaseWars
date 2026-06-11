@@ -75,6 +75,9 @@ BW.Lang["ru"] = {
 		Reputation = "Репутация",
 		Ping = "Пинг",
 	},
+	MapZone = {
+		DangerZone = "Вы вошли в зараженную зону!"
+	},
 	SpawnMenu = {
 		PropsTabName = "Пропы",
 		ShopTabName = "Магазин",
@@ -124,7 +127,6 @@ BW.Lang["ru"] = {
 		},
 		Drop = {
 			Error = "Вы не можете выбросить это оружие!",
-			Success = "Вы выбросили %s!",
 		},
 	},
 	Entity = {
