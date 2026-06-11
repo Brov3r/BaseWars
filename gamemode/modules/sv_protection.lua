@@ -148,7 +148,7 @@ end
 
 function MODULE:CheckAndApplyProtection(ply)
     if not IsValid(ply) then return end
-    
+
     local teamAllowed = (ply:Team() == (BW.TEAM_DEFAULT or TEAM_CONNECT or 1))
     if not teamAllowed then return end
 
@@ -227,7 +227,11 @@ function MODULE:Init()
     hook.Add("PlayerSpawnedNPC", "BW_Protection_RemoveOnSpawn", function(ply) self:StripProtection(ply) end)
 
     hook.Add("PlayerSpawn", "BW_Protection_SpawnLogic", function(ply)
-        self:CheckAndApplyProtection(ply)
+        timer.Simple(0.2, function()
+            if IsValid(ply) then
+                self:CheckAndApplyProtection(ply)
+            end
+        end)
     end)
 
     hook.Add("PlayerChangedTeam", "BW_Protection_RemoveOnTeam", function(ply, oldTeam, newTeam)
