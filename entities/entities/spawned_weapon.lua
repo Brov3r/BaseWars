@@ -32,12 +32,17 @@ if SERVER then
             local wepClass = self:GetWeaponClass()
             local ammo = self:GetAmmoCount()
 
-            if not activator:HasWeapon(wepClass) then
-                activator:Give(wepClass)
-            end
-
-            if ammo > 0 then
-                activator:GiveAmmo(ammo, activator:GetWeapon(wepClass):GetPrimaryAmmoType())
+            local wep = activator:Give(wepClass)
+            
+            if IsValid(wep) then
+                local ammoType = wep:GetPrimaryAmmoType()
+                if ammoType ~= -1 then
+                    activator:RemoveAmmo(activator:GetAmmoCount(ammoType), ammoType)
+                    
+                    if ammo > 0 then
+                        activator:GiveAmmo(ammo, ammoType)
+                    end
+                end
             end
             
             self:Remove()

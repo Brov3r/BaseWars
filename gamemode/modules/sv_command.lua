@@ -160,31 +160,30 @@ function MODULE:RegisterDefaultCommands()
         if not IsValid(activeWep) then return end
         
         local wepClass = activeWep:GetClass()
-
         if LoadoutCheck[wepClass] then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Drop.Error", "You can't throw away this weapon!"), 5)
             return
         end
 
-        local ammo = ply:GetAmmoCount(activeWep:GetPrimaryAmmoType())
+        local ammoType = activeWep:GetPrimaryAmmoType()
+        local ammoCount = ply:GetAmmoCount(ammoType)
+
+        ply:StripWeapon(wepClass)
 
         local ent = ents.Create("spawned_weapon")
         if not IsValid(ent) then return end
 
         local tr = ply:GetEyeTrace()
         local pos = (tr.StartPos:DistToSqr(tr.HitPos) > 40000) and (ply:GetShootPos() + ply:GetAimVector() * 80) or (tr.HitPos + tr.HitNormal * 15)
+        
         ent:SetPos(pos)
+        ent:SetWeaponClass(wepClass)
         ent:Spawn()
         
-        ent:SetWeaponClass(wepClass)
-        ent:SetAmmoCount(ammo)
-
-        local ammoType = activeWep:GetPrimaryAmmoType()
-        if ammoType ~= -1 then
-            ply:RemoveAmmo(ammo, ammoType)
+        if ammoType ~= -1 and ammoCount > 0 then
+            ent:SetAmmoCount(ammoCount)
+            ply:RemoveAmmo(ammoCount, ammoType)
         end
-
-        ply:StripWeapon(wepClass)
 
         local phys = ent:GetPhysicsObject()
         if IsValid(phys) then
