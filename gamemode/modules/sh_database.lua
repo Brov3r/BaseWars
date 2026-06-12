@@ -8,7 +8,7 @@ MODULE.DataBaseName = "bw_accounts"
 MODULE.Stats = {
     -- === Economy ===
     Money			= { default = function() return (BW.Config and BW.Config.Economy and BW.Config.Economy.StartMoney) or 5000 end, type = "Int", min = 0 },
-	Level			= { default = 1, type = "Int", max = 100, min = 0 },
+	Level			= { default = 1, type = "Int", max = 1000, min = 0 },
 	XP				= { default = 0, type = "Int", min = 0 },
 	RecoveryBalance = { default = 0, type = "Int", changeLog = false, min = 0 },
 	LifetimeEarned  = { default = 0, type = "Int", methods = { has = false }, changeLog = false, min = 0 },

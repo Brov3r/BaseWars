@@ -51,7 +51,7 @@ local function initFonts()
         else
             local fontBase = string.StripExtension(f)
             
-            for i = 10, 24, 2 do
+            for i = 10, 30, 2 do
                 mkFont(fontBase .. i, fontBase, i, 900)
                 mkFont(fontBase .. i .. "Thin", fontBase, i, 400)
             end

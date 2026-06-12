@@ -240,6 +240,44 @@ BW.Config = {
         }
     },
     Shop = {
+        ["booster_cat"] = {
+            ["booster_nofall"] = { ent = "bw_booster_nofall", model = "models/props_lab/jar01b.mdl", price = 6500, lvl = 1, max = 5, vip = false },
+            ["booster_jump"] = { ent = "bw_booster_double_jump", model = "models/props_lab/jar01b.mdl", price = 8500, lvl = 3, max = 5, vip = false },
+            
+            ["booster_speed"] = { ent = "bw_booster_speed", model = "models/props_lab/jar01b.mdl", price = 11500, lvl = 5, max = 5, vip = false },
+            ["booster_painkiller"] = { ent = "bw_booster_painkiller", model = "models/props_lab/jar01b.mdl", price = 15500, lvl = 6, max = 5, vip = false },
+            
+            ["booster_regeneration"] = { ent = "bw_booster_regeneration", model = "models/props_lab/jar01b.mdl", price = 20500, lvl = 12, max = 5, vip = false },
+            ["booster_armor_regen"] = { ent = "bw_booster_armor_regen", model = "models/props_lab/jar01b.mdl", price = 25000, lvl = 17, max = 5, vip = false },
+            
+            ["booster_rage"] = { ent = "bw_booster_rage", model = "models/props_lab/jar01b.mdl", price = 35000, lvl = 23, max = 3, vip = false },
+            ["booster_vampire"] = { ent = "bw_booster_vampire", model = "models/props_lab/jar01b.mdl", price = 40000, lvl = 30, max = 3, vip = false },
+
+            ["booster_invis"] = {
+                ent = "bw_booster_invis",
+                model = "models/props_lab/jar01b.mdl",
+                price = 50000,
+                lvl = 35,
+                max = 2,
+                vip = true,
+            },
+            ["booster_dash"] = {
+                ent = "bw_booster_dash",
+                model = "models/props_lab/jar01b.mdl",
+                price = 70000,
+                lvl = 45,
+                max = 2,
+                vip = true,
+            },
+            ["booster_resurrection"] = {
+                ent = "bw_booster_resurrection",
+                model = "models/props_lab/jar01b.mdl",
+                price = 120000,
+                lvl = 70,
+                max = 1,
+                vip = true,
+            },
+        },
         ["cat_1"] = {
             ["money_printer_1"] = {
                 ent = "item_healthkit",
@@ -249,7 +287,7 @@ BW.Config = {
                 max = 2,
                 vip = false,
             },
-        }
+        },
     },
 	PlayerGroups = {
         ["superadmin"] = {

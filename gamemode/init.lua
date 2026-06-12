@@ -54,7 +54,7 @@ function GM:PlayerDeath(victim, inflictor, attacker)
         
         if dropAmount > 0 then
             victim:TakeMoney(dropAmount)
-            victim:Notify(NOTIFY_WARNING, string.format(Translate("MoneyDropOnDeath", "Oops... You've lost %s%s!"), BW.Config.Economy.Currency, dropAmount), 5)
+            victim:Notify(NOTIFY_WARNING, string.format(Translate("MoneyDropOnDeath", "Oops... You've lost %s%s!"), BW.Config.Economy.Currency, BW.Utils.NumWithSep(dropAmount)), 5)
             local ent = ents.Create("spawned_money")
             if IsValid(ent) then
                 ent:SetPos(victim:GetPos() + Vector(0, 0, 20))

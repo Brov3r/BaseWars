@@ -2,7 +2,7 @@ local MODULE = MODULE
 
 MODULE.Name = "HUD"
 MODULE.Author = "Brov3r"
-MODULE.Require = { "database" }
+MODULE.Require = { "database", "booster" }
 
 local config     = BW.Config
 local colors     = config.Colors
@@ -26,6 +26,7 @@ end
 function MODULE:DrawOverheadName(ply)
     if not IsValid(ply) or not ply:Alive() then return end
     if ply == LocalPlayer() then return end
+    if ply:GetNWBool("BW_IsInvis") then return end
     if ply:GetNoDraw() then return end
     if not nameTagCfg then return end
 

@@ -43,7 +43,7 @@ if SERVER then
                 activator:AddMoney(self:GetAmount())
             end
             
-            activator:Notify(NOTIFY_SUCCESS, string.format(Translate("Entity.Money", "You have picked up %s%s"), BW.Config.Economy.Currency, self:GetAmount()), 5)
+            activator:Notify(NOTIFY_SUCCESS, string.format(Translate("Entity.Money", "You have picked up %s%s"), BW.Config.Economy.Currency, BW.Utils.NumWithSep(self:GetAmount())), 5)
             self:Remove()
         end
     end

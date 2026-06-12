@@ -335,7 +335,7 @@ function MODULE:AddCommands()
     end
     local addlevel = ulx.command(CATEGORY_NAME, "ulx addlevel", ulx.addlevel, "!addlevel")
     addlevel:addParam{type = ULib.cmds.PlayersArg}
-    addlevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 10000, hint = "Levels", ULib.cmds.round}
+    addlevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 1000, hint = "Levels", ULib.cmds.round}
     addlevel:defaultAccess(ULib.ACCESS_ADMIN)
     addlevel:help("Add levels to player(s).")
 
@@ -350,7 +350,7 @@ function MODULE:AddCommands()
     end
     local takelevel = ulx.command(CATEGORY_NAME, "ulx takelevel", ulx.takelevel, "!takelevel")
     takelevel:addParam{type = ULib.cmds.PlayersArg}
-    takelevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 10000, hint = "Levels", ULib.cmds.round}
+    takelevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 1000, hint = "Levels", ULib.cmds.round}
     takelevel:defaultAccess(ULib.ACCESS_ADMIN)
     takelevel:help("Take levels from player(s).")
 
@@ -365,7 +365,7 @@ function MODULE:AddCommands()
     end
     local setlevel = ulx.command(CATEGORY_NAME, "ulx setlevel", ulx.setlevel, "!setlevel")
     setlevel:addParam{type = ULib.cmds.PlayersArg}
-    setlevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 10000, hint = "Level", ULib.cmds.round}
+    setlevel:addParam{type = ULib.cmds.NumArg, min = 1, max = 1000, hint = "Level", ULib.cmds.round}
     setlevel:defaultAccess(ULib.ACCESS_SUPERADMIN)
     setlevel:help("Set player's level.")
 
