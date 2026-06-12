@@ -60,6 +60,10 @@ function MODULE:DrawOverheadName(ply)
 
     local currentAlpha = ply._overheadAlpha
 
+    local userGroup = ply:GetUserGroup()
+    local groupCfg  = BW.Config.PlayerGroups[userGroup]
+    local groupIcon = groupCfg and groupCfg.PrefixIcon and Material(groupCfg.PrefixIcon)
+
     cam.Start3D2D(pos, ang, nameTagCfg.Scale)
         local nick      = ply:Nick()
         local teamColor = team.GetColor(ply:Team()) or colors.White
@@ -69,10 +73,27 @@ function MODULE:DrawOverheadName(ply)
         local textBlack = Color(colors.Black.r, colors.Black.g, colors.Black.b, currentAlpha)
         local textTeam  = Color(teamColor.r, teamColor.g, teamColor.b, currentAlpha)
 
+        local iconSize = 22
+        local iconGap = 5
+        
+        surface.SetFont("Inter28")
+        local nickW = surface.GetTextSize(nick)
+        
+        local totalW = (groupIcon and (iconSize + iconGap + nickW) or nickW)
+        local startX = -totalW / 2
+        local currentX = startX
+        
+        if groupIcon then
+            surface.SetMaterial(groupIcon)
+            surface.SetDrawColor(255, 255, 255, currentAlpha)
+            surface.DrawTexturedRect(currentX, -21, iconSize, iconSize)
+            currentX = currentX + iconSize + iconGap
+        end
+
         draw.SimpleTextOutlined(
             nick, 
             "Inter28", 
-            0, 
+            currentX + (nickW / 2), 
             -10, 
             textWhite, 
             TEXT_ALIGN_CENTER, 

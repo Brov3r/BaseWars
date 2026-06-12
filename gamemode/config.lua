@@ -325,6 +325,7 @@ BW.Config = {
 		PayDayDefaultMax  		    = 800,
 		PayDayDefaultMultiplier     = 1,
         SafeMoneyAmountOnDeath      = 5000,
-        DropMoneyMultiplierDefault  = 0.1
+        DropMoneyMultiplierDefault  = 0.1,
+        ReputationDiscount          = 0.3
 	},
 }

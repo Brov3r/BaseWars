@@ -42,6 +42,17 @@ local function FindPropConfig(modelPath)
     return false, 0
 end
 
+function BW.GetFinalPrice(ply, basePrice)
+    if not IsValid(ply) then return basePrice end
+    
+    local rep = (ply.GetReputation and ply:GetReputation()) or 0
+    local discount = (BW.Config and BW.Config.Economy and BW.Config.Economy.ReputationDiscount) or 0.3
+    
+    -- Формула: чем выше репутация, тем ниже цена.
+    local multiplier = 1 - (rep / 100 * discount)
+    return math.Round(basePrice * multiplier)
+end
+
 function MODULE:InitServer()
     util.AddNetworkString("BW_BuyShopItem")
     util.AddNetworkString("BW_SpawnProp")
@@ -166,9 +177,11 @@ function MODULE:InitServer()
             end
         end
 
-        local price = itemData.price or 0
-        if price > 0 then
-            local hasMoney = (ply.HasMoney and ply:HasMoney(price)) or false
+        local basePrice = itemData.price or 0
+        local finalPrice = BW.GetFinalPrice(ply, basePrice)
+
+        if basePrice > 0 then
+            local hasMoney = (ply.HasMoney and ply:HasMoney(finalPrice)) or false
             if not hasMoney then
                 if ply.Notify then
                     ply:Notify(NOTIFY_ERROR, Translate("Shop.MoneyAlert", "Insufficient money!"), 5) 
@@ -240,8 +253,8 @@ function MODULE:InitServer()
         ent.Owner = ply
         ent:SetNWEntity("Owner", ply)
         
-        if price > 0 and ply.TakeMoney then
-            ply:TakeMoney(price)
+        if finalPrice > 0 and ply.TakeMoney then
+            ply:TakeMoney(finalPrice)
         end
 
         if itemData.max and itemData.max > 0 then
@@ -256,7 +269,7 @@ function MODULE:InitServer()
             end)
         end
         
-        Log("success", "Player ", BW.Config.Colors.Cyan, ply:Nick(), BW.Config.Colors.White, " bought ", BW.Config.Colors.Cyan, itemID, BW.Config.Colors.White, " for ", BW.Config.Colors.Cyan, (BW.Config.Economy.Currency or "$") .. price)
+        Log("success", "Player ", BW.Config.Colors.Cyan, ply:Nick(), BW.Config.Colors.White, " bought ", BW.Config.Colors.Cyan, itemID, BW.Config.Colors.White, " for ", BW.Config.Colors.Cyan, (BW.Config.Economy.Currency or "$") .. finalPrice)
         
         if ply.Notify then
             local itemNameTranslated = Translate("ShopItems." .. itemID, itemID)

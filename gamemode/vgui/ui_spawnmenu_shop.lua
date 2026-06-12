@@ -51,15 +51,19 @@ function ITEM_PANEL:OnCursorEntered()
         table.insert(labels, lblDesc)
     end
     
-    local price = data.price or 0
-    local lblPrice = vgui.Create("DLabel", tip)
+    local basePrice = data.price or 0
+    local finalPrice = BW.GetFinalPrice(LocalPlayer(), basePrice)
+    local finalPriceText = BW.Utils and BW.Utils.CompactNum(BW.GetFinalPrice(LocalPlayer(), basePrice)) or finalPrice
     local currency = (BW.Config and BW.Config.Economy and BW.Config.Economy.Currency) or "$"
-    local priceText = price > 0 and (currency .. (BW.Utils and BW.Utils.CompactNum(price) or price)) or Translate("Shop.Free", "Free")
-    lblPrice:SetText(Translate("Shop.Price", "Price:").. " " .. priceText)
-    lblPrice:SetFont("Inter12")
-    lblPrice:SetTextColor(c.Success or Color(100, 255, 100))
-    lblPrice:SizeToContents()
-    table.insert(labels, lblPrice)
+
+    if basePrice ~= finalPrice then
+        local lblPrice = vgui.Create("DLabel", tip)
+        lblPrice:SetText(Translate("Shop.Price", "Price:").. " " .. currency .. finalPriceText)
+        lblPrice:SetFont("Inter12")
+        lblPrice:SetTextColor(c.Success or Color(100, 255, 100))
+        lblPrice:SizeToContents()
+        table.insert(labels, lblPrice)
+    end
     
     if data.lvl and data.lvl > 0 then
         local lblLvl = vgui.Create("DLabel", tip)
@@ -160,6 +164,7 @@ function ITEM_PANEL:Paint(w, h)
 
     local ply = LocalPlayer()
     local price = self.ItemData.price or 0
+    local finalPrice = BW.GetFinalPrice(ply, price)
     local lvl = self.ItemData.lvl or 0
     local vip = self.ItemData.vip or false
 
@@ -174,18 +179,18 @@ function ITEM_PANEL:Paint(w, h)
         DrawCol = c.VipGold
     elseif not hasLevel then
         DrawCol = c.ShopLocked
-    elseif price <= 0 then
+    elseif finalPrice <= 0 then
         DrawCol = c.Transparent
     elseif myMoney then
-        if price >= myMoney * 2 then
+        if finalPrice >= myMoney * 2 then
             DrawCol = c.ShopLocked
-        elseif price > myMoney then
+        elseif finalPrice > myMoney then
             DrawCol = c.ShopNoMoney
-        elseif price < myMoney / 100 then
+        elseif finalPrice < myMoney / 100 then
             DrawCol = c.ShopCheap
         end
     else
-        local hasMoney = (ply.HasMoney and ply:HasMoney(price)) or false
+        local hasMoney = (ply.HasMoney and ply:HasMoney(finalPrice)) or false
         if not hasMoney then DrawCol = c.ShopNoMoney end
     end
 
@@ -197,6 +202,7 @@ function ITEM_PANEL:PaintOver(w, h)
 
     local ply = LocalPlayer()
     local price = self.ItemData.price or 0
+    local finalPrice = BW.GetFinalPrice(LocalPlayer(), price)
     local lvl = self.ItemData.lvl or 0
     local vip = self.ItemData.vip or false
     
@@ -233,8 +239,9 @@ function ITEM_PANEL:PaintOver(w, h)
 
     if price > 0 then
         local currency = (BW.Config and BW.Config.Economy and BW.Config.Economy.Currency) or "$"
-        local priceText = currency .. (BW.Utils and BW.Utils.CompactNum(price) or price)
         
+        local finalPriceText = BW.Utils and BW.Utils.CompactNum(finalPrice) or finalPrice
+        local priceText = currency .. finalPriceText
         draw.SimpleText(priceText, "Inter14", w / 2 + 2, h - 2, c.TextShade, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
         draw.SimpleText(priceText, "Inter14", w / 2, h - 4, clr_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_BOTTOM)
     end
@@ -250,13 +257,14 @@ function ITEM_PANEL:DoClick()
     
     local ply = LocalPlayer()
     local price = self.ItemData.price or 0
+    local finalPrice = BW.GetFinalPrice(ply, price)
     local lvl = self.ItemData.lvl or 0
     local vip = self.ItemData.vip or false
     local maxLimit = self.ItemData.max or 0
     
     local hasPrivilege = (ply.HasPrivilege and ply:HasPrivilege()) or false
     local hasLevel = (ply.HasLevel and ply:HasLevel(lvl)) or (not ply.HasLevel)
-    local hasMoney = (ply.HasMoney and ply:HasMoney(price)) or false
+    local hasMoney = (ply.HasMoney and ply:HasMoney(finalPrice)) or false
 
     if vip and not hasPrivilege then
         if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.VIPAlert", "This item is only available for VIP!"), 5) end
