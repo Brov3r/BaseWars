@@ -190,23 +190,18 @@ function MODULE:Init()
         self:OnPhysgunDrop(ply, ent)
     end)
 
-    hook.Add("EntityTakeDamage", "BW_SpawnProtection_Damage", function(ent, dmginfo)
-        if not IsValid(ent) or not ent:IsPlayer() then return end
+    hook.Add("PlayerShouldTakeDamage", "BW_SpawnProtection_Damage", function(ply, attacker)
+        if not IsValid(ply) or not ply:IsPlayer() then return nil end
 
-        if self:IsNearWorldSpawn(ent) then 
-            return true
+        if MODULE:IsNearWorldSpawn(ply) then 
+            return false
         end
 
-        if ent.BW_IsInvulnerable then
-            if dmginfo:IsFallDamage() or dmginfo:IsDamageType(DMG_CRUSH) 
-                or dmginfo:IsDamageType(DMG_DROWN) 
-                or dmginfo:IsDamageType(DMG_RADIATION) 
-                or (IsValid(dmginfo:GetAttacker()) and dmginfo:GetAttacker() == game.GetWorld()) then
-                                return
-            end
-            
-            return true
+        if ply.BW_IsInvulnerable and attacker and attacker:GetClass() ~= "worldspawn" then
+            return false
         end
+
+        return true 
     end)
 
     hook.Add("WeaponEquip", "BW_Protection_RemoveOnPickup", function(wep, ply)
@@ -230,7 +225,7 @@ function MODULE:Init()
     hook.Add("PlayerSpawn", "BW_Protection_SpawnLogic", function(ply)
         timer.Simple(0.2, function()
             if IsValid(ply) then
-                self:CheckAndApplyProtection(ply)
+               self:CheckAndApplyProtection(ply)
             end
         end)
     end)

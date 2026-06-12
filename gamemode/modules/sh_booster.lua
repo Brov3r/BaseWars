@@ -607,6 +607,8 @@ function MODULE:RegisterHooks()
                     end
                 end
             end
+
+            return false 
         end)
     end
 end
