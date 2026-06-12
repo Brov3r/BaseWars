@@ -15,19 +15,21 @@ if SERVER then
     function ENT:Initialize()
         self:SetModel("models/props/cs_assault/money.mdl")
         
-        self:PhysicsInit(SOLID_VPHYSICS)
-        self:SetMoveType(MOVETYPE_VPHYSICS)
-        self:SetSolid(SOLID_VPHYSICS)
-        self:SetUseType(SIMPLE_USE)
-        self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
-
-        local mins, maxs = self:GetModelBounds()
+        local mins = self:OBBMins()
+        local maxs = self:OBBMaxs()
         
         maxs.z = maxs.z * 5.5
         mins.z = mins.z * 5.5
         
-        self:SetCollisionBounds(mins, maxs)
+        self:PhysicsInitBox(mins, maxs)
         
+        self:SetMoveType(MOVETYPE_VPHYSICS)
+        self:SetSolid(SOLID_VPHYSICS)
+        self:SetUseType(SIMPLE_USE)
+        self:SetCollisionGroup(COLLISION_GROUP_WEAPON)
+        
+        self:SetCollisionBounds(mins, maxs)
+
         local phys = self:GetPhysicsObject()
         if IsValid(phys) then
             phys:Wake()

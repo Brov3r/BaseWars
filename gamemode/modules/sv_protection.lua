@@ -200,6 +200,7 @@ function MODULE:Init()
         if ent.BW_IsInvulnerable then
             if dmginfo:IsFallDamage() or dmginfo:IsDamageType(DMG_CRUSH) 
                 or dmginfo:IsDamageType(DMG_DROWN) 
+                or dmginfo:IsDamageType(DMG_RADIATION) 
                 or (IsValid(dmginfo:GetAttacker()) and dmginfo:GetAttacker() == game.GetWorld()) then
                                 return
             end

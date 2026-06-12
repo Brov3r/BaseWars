@@ -32,7 +32,15 @@ function MODULE:Init()
                 end
                 
                 if damage > 0 then
-                    ply:TakeDamage(damage, game.GetWorld(), game.GetWorld())
+                    local finalDamage = math.max(1, math.ceil(damage)) 
+                    
+                    local dmgInfo = DamageInfo()
+                    dmgInfo:SetDamage(finalDamage)
+                    dmgInfo:SetDamageType(DMG_RADIATION)
+                    dmgInfo:SetAttacker(game.GetWorld())
+                    dmgInfo:SetInflictor(game.GetWorld())
+                    
+                    ply:TakeDamageInfo(dmgInfo)
                 end
             else
                 ply._InHeightDanger = false
