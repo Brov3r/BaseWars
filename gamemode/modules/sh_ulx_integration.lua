@@ -30,188 +30,181 @@ function MODULE:Init()
     end
 end
 
+local function formatNum(val)
+    if BW and BW.Utils and BW.Utils.NumWithSep then
+        return BW.Utils.NumWithSep(val)
+    end
+    return tostring(val)
+end
+
+local function getStat(ply, funcName, default)
+    return (ply[funcName] and ply[funcName](ply)) or default
+end
+
+local function CreateHorizontalScrollList(parent)
+    local container = vgui.Create("DPanel", parent)
+    container:SetPaintBackground(false)
+
+    local list = vgui.Create("DListView", container)
+    list:SetMultiSelect(false)
+
+    local hScroll = vgui.Create("DSlider", container)
+    hScroll:SetLockY(0.5)
+    hScroll:SetTrapInside(true)
+    hScroll.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 3, w, h - 6, Color(50, 50, 50, 80))
+    end
+    hScroll.Knob.Paint = function(self, w, h)
+        draw.RoundedBox(4, 0, 0, w, h, Color(255, 255, 255, 220))
+    end
+
+    function hScroll:TranslateValues(x, y)
+        container:InvalidateLayout()
+        return x, y
+    end
+
+    container.PerformLayout = function(self, w, h)
+        if not IsValid(list) or not IsValid(hScroll) then return end
+        
+        local totalWidth = 0
+        for _, col in pairs(list.Columns or {}) do
+            totalWidth = totalWidth + (col:GetMinWidth() or 100)
+        end
+
+        hScroll:SetSize(w, 14)
+        hScroll:SetPos(0, h - 14)
+
+        local maxScrollDistance = totalWidth - w
+        if maxScrollDistance <= 0 then
+            list:SetSize(w, h)
+            list:SetPos(0, 0)
+            hScroll:SetVisible(false)
+        else
+            hScroll:SetVisible(true)
+            list:SetSize(totalWidth, h - 16)
+            local fraction = hScroll:GetSlideX()
+            list:SetPos(-fraction * maxScrollDistance, 0)
+        end
+    end
+
+    return container, list
+end
+
+
 function MODULE:AddXGUITab()
     local function DynamicInit()
         if not xgui then return end
 
+        local currency = (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.Currency) or "$"
+
+        local STAT_COLUMNS = {
+            { name = "Player",      minW = 140, get = function(p) return p:Nick() end },
+            { name = "SteamID",     minW = 140, get = function(p) return p:SteamID() end },
+            { name = "HP",          minW = 60,  get = function(p) return p:Health() end },
+            { name = "Armor",       minW = 60,  get = function(p) return p:Armor() end },
+            { name = "Group",       minW = 100, get = function(p) return p:GetUserGroup() end },
+            { name = "Money",       minW = 100, get = function(p) return currency .. formatNum(getStat(p, "GetMoney", 0)) end },
+            { name = "Lvl",         minW = 50,  get = function(p) return getStat(p, "GetLevel", 1) end },
+            { name = "XP",          minW = 120, get = function(p) return formatNum(getStat(p, "GetXP", 0)) .. " / " .. formatNum(getStat(p, "GetMaxXP", 0)) end },
+            { name = "Bounty",      minW = 100, get = function(p) return currency .. formatNum(getStat(p, "GetBounty", 0)) end },
+            { name = "Reputation",  minW = 80,  get = function(p) return formatNum(getStat(p, "GetReputation", 0)) end },
+            { name = "K / D",       minW = 80,  get = function(p) return getStat(p, "GetKills", 0) .. " / " .. getStat(p, "GetDeaths", 0) end },
+            { name = "PlayTime",    minW = 100, get = function(p) 
+                local pt = getStat(p, "GetPlayTime", 0)
+                return pt > 0 and string.format("%d h. %d m.", math.floor(pt / 60), pt % 60) or "0 m."
+            end },
+            { name = "DonateUntil", minW = 100, get = function(p) 
+                local du = getStat(p, "GetDonateUntil", 0)
+                if type(du) == "number" and du > 0 then return os.date("%d.%m.%Y", du) end
+                if type(du) == "string" and du ~= "" then return du end
+                if du == -1 then return "Forever" end
+                return "No"
+            end },
+            { name = "Raid Atk",    minW = 80,  get = function(p) return formatNum(getStat(p, "GetRaidAttacks", 0)) end },
+            { name = "Raid Def",    minW = 80,  get = function(p) return formatNum(getStat(p, "GetRaidDefenses", 0)) end }
+        }
+
         -- =========================================================================
-        -- Stats
+        -- UI: Stats Tab
         -- =========================================================================
         local xpanel = vgui.Create("DPanel")
         xpanel:SetPaintBackground(false)
-        
+
         local topBar = vgui.Create("DPanel", xpanel)
         topBar:Dock(TOP)
-        topBar:SetHeight(35)
-        topBar:DockMargin(5, 5, 5, 0)
-        topBar.Paint = function() end
+        topBar:SetTall(30)
+        topBar:DockMargin(5, 5, 5, 5)
+        topBar:SetPaintBackground(false)
 
-        local listContainer = vgui.Create("DPanel", xpanel)
+        local btnRefresh = vgui.Create("DButton", topBar)
+        btnRefresh:Dock(LEFT)
+        btnRefresh:SetText("Refresh")
+        btnRefresh:SetWide(100)
+        btnRefresh:SetIcon("icon16/arrow_refresh.png")
+
+        local listContainer, list = CreateHorizontalScrollList(xpanel)
         listContainer:Dock(FILL)
-        listContainer:DockMargin(5, 5, 5, 5)
-        listContainer:SetPaintBackground(false)
+        listContainer:DockMargin(5, 0, 5, 5)
 
-        local list = vgui.Create("DListView", listContainer)
-        list:SetMultiSelect(false)
-        
-        list:AddColumn("Player"):SetWidth(140)
-        list:AddColumn("Group"):SetWidth(90)
-        list:AddColumn("Money"):SetWidth(110)
-        list:AddColumn("Lvl"):SetWidth(50)
-        list:AddColumn("XP"):SetWidth(120)
-        list:AddColumn("Bounty"):SetWidth(90)
-        list:AddColumn("Reputation"):SetWidth(80)
-        list:AddColumn("K / D"):SetWidth(80)
-        list:AddColumn("PlayTime"):SetWidth(100)
-        list:AddColumn("DonateUntil"):SetWidth(100)
-        list:AddColumn("RaidAttacks"):SetWidth(90)
-        list:AddColumn("RaidDefenses"):SetWidth(90)
-
-        local totalColumnsWidth = 1140
-
-        local hScroll = vgui.Create("DSlider", listContainer)
-        hScroll:SetHeight(14)
-        hScroll:SetLockY(0.5)
-        hScroll:SetTrapInside(true)
-        hScroll.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 3, w, h - 6, Color(50, 50, 50, 80))
-        end
-        hScroll.Knob.Paint = function(self, w, h)
-            draw.RoundedBox(4, 0, 0, w, h, Color(255, 255, 255, 220))
-        end
-
-        function hScroll:TranslateValues(x, y)
-            listContainer:InvalidateLayout()
-            return x, y
-        end
-
-        listContainer.PerformLayout = function(self, w, h)
-            if not IsValid(list) or not IsValid(hScroll) then return end
-            
-            hScroll:SetSize(w - 10, 14)
-            hScroll:SetPos(5, h - 14)
-            
-            local maxScrollDistance = totalColumnsWidth - w
-            if maxScrollDistance <= 0 then
-                list:SetSize(w, h)
-                list:SetPos(0, 0)
-                hScroll:SetVisible(false)
-            else
-                hScroll:SetVisible(true)
-                list:SetSize(totalColumnsWidth, h - 18)
-                
-                local fraction = hScroll:GetSlideX()
-                list:SetPos(-fraction * maxScrollDistance, 0)
-            end
-        end
-
-        local function formatNum(val)
-            if BW and BW.Utils and BW.Utils.NumWithSep then
-                return BW.Utils.NumWithSep(val)
-            end
-            return tostring(val)
+        for _, colData in ipairs(STAT_COLUMNS) do
+            local col = list:AddColumn(colData.name)
+            col:SetMinWidth(colData.minW)
         end
 
         local function refreshPlayerStats()
             if not IsValid(list) then return end
             list:Clear()
-            local currency = (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.Currency) or "$"
 
             for _, ply in ipairs(player.GetAll()) do
-                if IsValid(ply) then
-                    local money       = (ply.GetMoney and ply:GetMoney()) or 0
-                    local lvl         = (ply.GetLevel and ply:GetLevel()) or 1
-                    local xp          = (ply.GetXP and ply:GetXP()) or 0
-                    local max_xp      = (ply.GetMaxXP and ply:GetMaxXP()) or 0
-                    local bounty      = (ply.GetBounty and ply:GetBounty()) or 0
-                    local rep         = (ply.GetReputation and ply:GetReputation()) or 0
-                    local kills       = (ply.GetKills and ply:GetKills()) or 0
-                    local deaths      = (ply.GetDeaths and ply:GetDeaths()) or 0
-                    
-                    local playtime    = (ply.GetPlayTime and ply:GetPlayTime()) or 0
-                    local donateUntil = (ply.GetDonateUntil and ply:GetDonateUntil()) or 0
-                    local raidAtk     = (ply.GetRaidAttacks and ply:GetRaidAttacks()) or 0
-                    local raidDef     = (ply.GetRaidDefenses and ply:GetRaidDefenses()) or 0
-
-                    local playTimeStr = "0 m."
-                    if playtime > 0 then
-                        local hours = math.floor(playtime / 60)
-                        local mins = playtime % 60
-                        if hours > 0 then
-                            playTimeStr = hours .. " h. " .. mins .. " m."
-                        else
-                            playTimeStr = mins .. " m."
-                        end
-                    end
-
-                    local donateStr = "No"
-                    if type(donateUntil) == "number" and donateUntil > 0 then
-                        donateStr = os.date("%d.%m.%Y", donateUntil)
-                    elseif type(donateUntil) == "string" and donateUntil ~= "" then
-                        donateStr = donateUntil
-                    elseif donateUntil == -1 then
-                        donateStr = "Forever"
-                    end
-
-                    local row = list:AddLine(
-                        ply:Nick(),
-                        ply:GetUserGroup(),
-                        currency .. formatNum(money),
-                        lvl,
-                        formatNum(xp) .. " / " .. formatNum(max_xp),
-                        currency .. formatNum(bounty),
-                        formatNum(rep),
-                        kills .. " / " .. deaths,
-                        playTimeStr,
-                        donateStr,
-                        formatNum(raidAtk),
-                        formatNum(raidDef)
-                    )
-                    row.TargetPlayer = ply
+                if not IsValid(ply) then continue end
+                
+                local rowData = {}
+                for _, colData in ipairs(STAT_COLUMNS) do
+                    table.insert(rowData, colData.get(ply))
                 end
+                
+                local row = list:AddLine(unpack(rowData))
+                row.TargetPlayer = ply
             end
+            
+            listContainer:InvalidateLayout() 
         end
 
-        local btnRefresh = vgui.Create("DButton", topBar)
-        btnRefresh:Dock(LEFT)
-        btnRefresh:SetText("Refresh")
-        btnRefresh:SetWidth(140)
-        btnRefresh:SetIcon("icon16/arrow_refresh.png")
-        btnRefresh.DoClick = function()
-            refreshPlayerStats()
-        end
-
-        xpanel.UpdateContent = function()
-            refreshPlayerStats()
-        end
-
+        btnRefresh.DoClick = refreshPlayerStats
+        xpanel.UpdateContent = refreshPlayerStats
         refreshPlayerStats()
+
         xgui.addModule("Stats", xpanel, "icon16/application_view_detail.png", "ulx addmoney")
 
         -- =========================================================================
-        -- Reports
+        -- UI: Reports Tab
         -- =========================================================================
         local rpanel = vgui.Create("DPanel")
         rpanel:SetPaintBackground(false)
 
         local rTopBar = vgui.Create("DPanel", rpanel)
         rTopBar:Dock(TOP)
-        rTopBar:SetHeight(35)
-        rTopBar:DockMargin(5, 5, 5, 0)
-        rTopBar.Paint = function() end
+        rTopBar:SetTall(30)
+        rTopBar:DockMargin(5, 5, 5, 5)
+        rTopBar:SetPaintBackground(false)
+
+        local btnRRefresh = vgui.Create("DButton", rTopBar)
+        btnRRefresh:Dock(LEFT)
+        btnRRefresh:SetText("Refresh")
+        btnRRefresh:SetWide(100)
+        btnRRefresh:SetIcon("icon16/arrow_refresh.png")
 
         local rList = vgui.Create("DListView", rpanel)
         rList:Dock(FILL)
-        rList:DockMargin(5, 5, 5, 5)
+        rList:DockMargin(5, 0, 5, 5)
         rList:SetMultiSelect(false)
 
-        rList:AddColumn("ID"):SetWidth(40)
-        rList:AddColumn("Date"):SetWidth(130)
-        rList:AddColumn("Player Name"):SetWidth(140)
-        rList:AddColumn("SteamID"):SetWidth(140)
-        rList:AddColumn("Message"):SetWidth(450)
+        rList:AddColumn("ID"):SetMaxWidth(60)
+        rList:AddColumn("Date"):SetMinWidth(110)
+        rList:AddColumn("Player Name"):SetMinWidth(120)
+        rList:AddColumn("SteamID"):SetMinWidth(120)
+        rList:AddColumn("Message"):SetMinWidth(190)
 
-        -- Запрос репортов у сервера
         local function requestReports()
             if not IsValid(rList) then return end
             rList:Clear()
@@ -219,18 +212,11 @@ function MODULE:AddXGUITab()
             net.SendToServer()
         end
 
-        local btnRRefresh = vgui.Create("DButton", rTopBar)
-        btnRRefresh:Dock(LEFT)
-        btnRRefresh:SetText("Refresh")
-        btnRRefresh:SetWidth(140)
-        btnRRefresh:SetIcon("icon16/arrow_refresh.png")
-        btnRRefresh.DoClick = function()
-            requestReports()
-        end
+        btnRRefresh.DoClick = requestReports
 
         net.Receive("BW_XGUI_SendReports", function()
-            local data = net.ReadTable()
             if not IsValid(rList) then return end
+            local data = net.ReadTable()
 
             rList:Clear()
             for _, report in ipairs(data) do
@@ -245,11 +231,9 @@ function MODULE:AddXGUITab()
             end
         end)
 
-        rpanel.UpdateContent = function()
-            requestReports()
-        end
-
+        rpanel.UpdateContent = requestReports
         requestReports()
+
         xgui.addModule("Reports", rpanel, "icon16/report_magnify.png", "ulx addmoney")
     end
 

@@ -1,6 +1,8 @@
 BW.Lang["ru"] = {
 	Weapons = {
-		["hands"] = "Руки"
+		["hands"] = "Руки",
+		["bw_weapon_blowtorch"] = "Паяльная лампа",
+		["bw_weapon_c4"] = "Взрывчатка c4",
 	},
 	Notify = {
 		Info = "Информация",

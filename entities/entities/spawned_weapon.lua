@@ -1,4 +1,6 @@
-AddCSLuaFile()
+if SERVER then
+    AddCSLuaFile()
+end
 
 ENT.Type = "anim"
 ENT.Base = "base_entity"

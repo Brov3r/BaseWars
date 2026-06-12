@@ -1,3 +1,7 @@
+if SERVER then
+    AddCSLuaFile()
+end
+
 SWEP.Base = "weapon_base"
 SWEP.Slot = 1
 SWEP.SlotPos = 0
