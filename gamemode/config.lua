@@ -215,8 +215,7 @@ BW.Config = {
             {hp = 300, "models/props_c17/fence03a.mdl"},
             {hp = 900, "models/props_combine/combine_barricade_short02a.mdl"},  
             {hp = 100, "models/props_borealis/bluebarrel001.mdl"},              
-            {hp = 180, "models/props_c17/oildrum001.mdl"},                      
-            {hp = 40, "models/props_c17/oildrum001_explosive.mdl"}              
+            {hp = 180, "models/props_c17/oildrum001.mdl"},          
         },
 
         ["interior_and_environment"] = {

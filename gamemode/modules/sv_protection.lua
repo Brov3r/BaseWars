@@ -136,7 +136,7 @@ function MODULE:AttemptUnghost(ent)
         
         local phys = ent:GetPhysicsObject()
         if IsValid(phys) then 
-            phys:EnableMotion(true)
+            phys:EnableMotion(false)
             phys:Wake()
         end
     else
@@ -271,6 +271,16 @@ end
 function MODULE:OnPhysgunPickup(ply, ent)
     if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() then return end
 
+    if ent:CreatedByMap() then return end
+
+    local class = ent:GetClass()
+    if string.match(class, "^func_") or string.match(class, "^trigger_") then return end
+
+    if CPPI and ent.CPPIGetOwner then
+        local owner = ent:CPPIGetOwner()
+        if not IsValid(owner) or not owner:IsPlayer() then return end
+    end
+
     if not ent.bw_IsGhosted then
         ent.bw_OldCollision = ent:GetCollisionGroup()
         ent.bw_OldRenderMode = ent:GetRenderMode()
@@ -296,6 +306,8 @@ function MODULE:OnPhysgunDrop(ply, ent)
     ent._IsHeld = false 
 
     timer.Simple(BW.Config.Protection.UnghostDelay, function()
-        MODULE:AttemptUnghost(ent)
+        if IsValid(ent) and MODULE and MODULE.AttemptUnghost then
+            MODULE:AttemptUnghost(ent)
+        end
     end)
 end

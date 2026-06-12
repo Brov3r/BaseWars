@@ -7,7 +7,7 @@ MODULE.Require = { "database" }
 local lvlIcon = Material("icon16/award_star_gold_3.png")
 local iconRepUp   = Material("icon16/thumb_up.png")
 local iconRepDown = Material("icon16/thumb_down.png")
-local iconRepZero = Material("icon16/heart.png")
+local heartMat = Material("icon16/heart.png")
 local config   = BW.Config
 local hud      = config.HUD
 local colors   = config.Colors
@@ -196,7 +196,7 @@ function MODULE:DrawHUD()
     local rightEdge  = barX + barW
     local repW, _    = surface.GetTextSize(repStr)
 
-    local repIcon = iconRepZero
+    local repIcon = heartMat
     if currentRep > 0 then
         repIcon = iconRepUp
     elseif currentRep < 0 then
@@ -265,37 +265,97 @@ function MODULE:DrawEntInfo()
     local tr = ply:GetEyeTrace()
     local ent = tr.Entity
 
-    if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() then return end
+    self.CurrentEnt = self.CurrentEnt or nil
+    self.CurrentAlpha = self.CurrentAlpha or 0
+    self.OldEnt = self.OldEnt or nil
+    self.OldAlpha = self.OldAlpha or 0
+    self.LoseTime = self.LoseTime or 0
+
+    local delayTime = 2.0 -- Держится 2 секунды после отвода взгляда
+    local fadeSpeed = 1.5 * FrameTime() -- Плавная скорость исчезновения/появления (~0.6-0.8 сек)
+
+    local isValidTarget = IsValid(ent) 
+        and not ent:IsPlayer() 
+        and not ent:IsWorld() 
+        and tr.HitPos:DistToSqr(ply:GetShootPos()) <= BW.Config.HUD.DrawEntInfoDistance ^ 2
+
+    if isValidTarget then
+        if ent ~= self.CurrentEnt then
+            self.OldEnt = self.CurrentEnt
+            self.OldAlpha = self.CurrentAlpha
+            self.CurrentEnt = ent
+            self.CurrentAlpha = 0
+        end
+        self.CurrentAlpha = math.Approach(self.CurrentAlpha, 1, fadeSpeed)
+        self.LoseTime = CurTime() + delayTime
+    else
+        if CurTime() < self.LoseTime then
+            self.CurrentAlpha = math.Approach(self.CurrentAlpha, 1, fadeSpeed)
+        else
+            self.CurrentAlpha = math.Approach(self.CurrentAlpha, 0, fadeSpeed)
+        end
+    end
+
+    if self.OldEnt and self.OldAlpha > 0 then
+        self.OldAlpha = math.Approach(self.OldAlpha, 0, fadeSpeed)
+        if self.OldAlpha <= 0.01 then
+            self.OldEnt = nil
+        end
+    end
+
+    if self.CurrentAlpha < 0.01 and not isValidTarget and CurTime() >= self.LoseTime then
+        self.CurrentEnt = nil
+    end
+
+    if self.OldEnt and self.OldAlpha > 0.01 then
+        self:DrawTargetInfo(self.OldEnt, self.OldAlpha)
+    end
+
+    if self.CurrentEnt and self.CurrentAlpha > 0.01 then
+        self:DrawTargetInfo(self.CurrentEnt, self.CurrentAlpha)
+    end
+end
+
+function MODULE:DrawTargetInfo(targetEnt, alpha)
+    local ply = LocalPlayer()
+    if not IsValid(targetEnt) or alpha < 0.01 then return end
+
+    local alphaByte = math.floor(alpha * 255)
     
-    if tr.HitPos:DistToSqr(ply:GetShootPos()) > BW.Config.HUD.DrawEntInfoDistance ^2 then return end
+    local function GetAlphaColor(col)
+        return Color(col.r, col.g, col.b, (col.a or 255) * alpha)
+    end
+
+    local textColor = Color(255, 255, 255, alphaByte)
+    local shadowColor = Color(0, 0, 0, alphaByte)
+    local barBgColor = GetAlphaColor(colors.DarkGray)
+    local barFgColor = GetAlphaColor(colors.White)
 
     local ownerName = Translate("HUD.OwnerUnknown", "Unknown")
-
     if CPPI and CPPI.GetName() == "Warden" then
-        ownerName = ent:WardenGetOwnerName()
-        if ent:WardenGetOwnerID() == "World" then
+        ownerName = targetEnt:WardenGetOwnerName()
+        if targetEnt:WardenGetOwnerID() == "World" then
             ownerName = Translate("HUD.WorldText", "World")
         end
-    elseif ent.CPPIGetOwner then
-        local cppiOwner = ent:CPPIGetOwner()
+    elseif targetEnt.CPPIGetOwner then
+        local cppiOwner = targetEnt:CPPIGetOwner()
         if IsValid(cppiOwner) and cppiOwner:IsPlayer() then
             ownerName = cppiOwner:Nick()
         end
-    elseif IsValid(ent.Owner) then
-        ownerName = ent.Owner:Nick()
+    elseif IsValid(targetEnt.Owner) then
+        ownerName = targetEnt.Owner:Nick()
     end
 
-    local maxHP = ent:GetMaxHealth()
-    local currentHP = math.max(0, ent:Health())
+    local maxHP = targetEnt:GetMaxHealth()
+    local currentHP = math.max(0, targetEnt:Health())
     local textFont = "Inter14"
 
-    local obbMins, obbMaxs = ent:OBBMins(), ent:OBBMaxs()
+    local obbMins, obbMaxs = targetEnt:OBBMins(), targetEnt:OBBMaxs()
     local height = obbMaxs.z - obbMins.z
-    
     local isSmall = height < 25 
 
-    local obbCenter = ent:OBBCenter()
-    local pos = ent:LocalToWorld(obbCenter)
+    local obbCenter = targetEnt:OBBCenter()
+    local pos = targetEnt:LocalToWorld(obbCenter)
 
     if isSmall then
         pos = pos + Vector(0, 0, (height / 2) + 5)
@@ -315,28 +375,40 @@ function MODULE:DrawEntInfo()
             local barH = 5
             local barX = -barW / 2
             local barY = 0
-
-            BW.Utils.DrawProgressBar(barX, barY, barW, barH, currentHP, 0, maxHP, colors.White, colors.DarkGray)
-
+            
             local hpString = string.format("%i/%i", currentHP, maxHP)
             local ownerString = string.format("%s: %s", Translate("HUD.OwnerLabel", "Owner"), BW.Utils.TruncateText(ownerName, textFont, 85))
+            
+            surface.SetFont(textFont)
+            local hpW, hpH = surface.GetTextSize(hpString)
+            
+            local iconSize = 12
+            local iconGap = 4
+            
+            local iconX = (barX + barW) - iconSize
+            local iconY = (barY - 2) - iconSize
 
-            BW.Utils.DrawShadowedText(ownerString, textFont, barX, barY - 2, colors.White, colors.Black, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
-            BW.Utils.DrawShadowedText(hpString, textFont, barX + barW, barY - 2, colors.White, colors.Black, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+            surface.SetMaterial(heartMat)
+            surface.SetDrawColor(255, 255, 255, alphaByte)
+            surface.DrawTexturedRect(iconX, iconY, iconSize, iconSize)
+
+            BW.Utils.DrawProgressBar(barX, barY, barW, barH, currentHP, 0, maxHP, barFgColor, barBgColor)
+           
+            BW.Utils.DrawShadowedText(ownerString, textFont, barX, barY - 2, textColor, shadowColor, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
+            BW.Utils.DrawShadowedText(hpString, textFont, barX + barW - iconSize - iconGap, barY - 2, textColor, shadowColor, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
         else
             local ownerString = string.format("%s: %s", Translate("HUD.OwnerLabel", "Owner"), BW.Utils.TruncateText(ownerName, textFont, 120))
             
             surface.SetFont(textFont)
             local textW, textH = surface.GetTextSize(ownerString)
-            
             local textY = -textH / 2
 
-            BW.Utils.DrawShadowedText(ownerString, textFont, 0, textY, colors.White, colors.Black, 1, 1, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
+            BW.Utils.DrawShadowedText(ownerString, textFont, 0, textY, textColor, shadowColor, 1, 1, TEXT_ALIGN_CENTER, TEXT_ALIGN_TOP)
 
-            surface.SetDrawColor(colors.White.r, colors.White.g, colors.White.b, 220)
+            surface.SetDrawColor(colors.White.r, colors.White.g, colors.White.b, 220 * alpha)
             surface.DrawRect(-textW / 2, textY + textH + 2, textW, 1)
 
-            surface.SetDrawColor(0, 0, 0, 200)
+            surface.SetDrawColor(0, 0, 0, 200 * alpha)
             surface.DrawRect(-textW / 2, textY + textH + 3, textW, 1)
         end
         cam.IgnoreZ(false)
