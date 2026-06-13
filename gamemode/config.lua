@@ -278,13 +278,23 @@ BW.Config = {
                 vip = true,
             },
         },
-        ["cat_1"] = {
-            ["money_printer_1"] = {
-                ent = "item_healthkit",
-                model = "models/props_interiors/VendingMachineSoda01a.mdl",
-                price = 1000,
-                lvl = 1,
-                max = 2,
+        ["devices_cat"] = {
+            ["spawnpoint"] = {
+                ent = "bw_spawnpoint",
+                model = "models/props_trainstation/trainstation_clock001.mdl",
+                price = 10000,
+                lvl = 5,
+                max = 1,
+                vip = false,
+            },
+        },
+        ["common_cat"] = {
+            ["m_repair"] = {
+                ent = "bw_module_repair",
+                model = "models/Items/combine_rifle_ammo01.mdl",
+                price = 500,
+                lvl = 5,
+                max = 1,
                 vip = false,
             },
         },
@@ -296,7 +306,8 @@ BW.Config = {
             PrefixColor = Color(37,214,37),
 			PrefixText = "Owner",
 			PrefixIcon = "icon16/shield.png",
-            Privilege = true
+            Privilege = true,
+            SellReturnRatio = 1,
         },
         ["admin"] = {
             PayDayMultiplier = 2.5,
@@ -304,6 +315,8 @@ BW.Config = {
             PrefixColor = Color(245,79,49),
 			PrefixText = "Admin",
 			PrefixIcon = "icon16/ruby.png",
+            Privilege = true,
+            SellReturnRatio = 1,
         },
         ["vip"] = {
             PayDayMultiplier = 2.0,
@@ -312,9 +325,7 @@ BW.Config = {
 			PrefixText = "VIP",
 			PrefixIcon = "icon16/star.png",
             Privilege = true,
-        },
-        ["user"] = {
-            PayDayMultiplier = 1.0,
+            SellReturnRatio = 0.85,
         },
     },
 	Economy = {
@@ -326,6 +337,8 @@ BW.Config = {
 		PayDayDefaultMultiplier     = 1,
         SafeMoneyAmountOnDeath      = 5000,
         DropMoneyMultiplierDefault  = 0.1,
-        ReputationDiscount          = 0.3
+        ReputationDiscount          = 0.3,
+        SellReturnRatioDefault      = 0.6,
+        AutoRefundTime              = 30,
 	},
 }

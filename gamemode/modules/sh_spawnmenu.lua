@@ -150,7 +150,7 @@ function MODULE:InitServer()
         local itemData = FindShopItem(itemID)
 
         if not itemData then 
-            Log("error", "Player ", BW.Config.Colors.Cyan, ply:Nick(), BW.Config.Colors.White, " tried to buy a non-existent ID: ", BW.Config.Colors.Cyan, tostring(itemID))
+            Log("error", string.format("Player %s tried to buy a non-existent ID: %s", ply:Nick(), tostring(itemID)))
             return 
         end
 
@@ -160,9 +160,7 @@ function MODULE:InitServer()
             local hasVIP = groupConfig and groupConfig.Privilege == true
 
             if not hasVIP then
-                if ply.Notify then 
-                    ply:Notify(NOTIFY_ERROR, Translate("Shop.VIPAlert", "This item requires VIP status!"), 5) 
-                end
+                if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.VIPAlert", "This item requires VIP status!"), 5) end
                 return
             end
         end
@@ -170,9 +168,7 @@ function MODULE:InitServer()
         if itemData.lvl and itemData.lvl > 0 then
             local hasLevel = (ply.HasLevel and ply:HasLevel(itemData.lvl)) or (not ply.HasLevel)
             if not hasLevel then
-                if ply.Notify then 
-                    ply:Notify(NOTIFY_ERROR, Translate("Shop.LvlAlert", "Your level is too low!"), 5) 
-                end
+                if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.LvlAlert", "Your level is too low!"), 5) end
                 return
             end
         end
@@ -183,16 +179,13 @@ function MODULE:InitServer()
         if basePrice > 0 then
             local hasMoney = (ply.HasMoney and ply:HasMoney(finalPrice)) or false
             if not hasMoney then
-                if ply.Notify then
-                    ply:Notify(NOTIFY_ERROR, Translate("Shop.MoneyAlert", "Insufficient money!"), 5) 
-                end
+                if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.MoneyAlert", "Insufficient money!"), 5) end
                 return
             end
         end
 
         if itemData.max and itemData.max > 0 then
             local currentCount = ply:GetNWInt("BW_ItemCount_" .. itemID, 0)
-
             if currentCount >= itemData.max then
                 if ply.Notify then
                     ply:Notify(NOTIFY_ERROR, string.format(Translate("Shop.MaxLimitAlert", "You have reached the limit for this item! (Max: %s)"), tostring(itemData.max)), 5)
@@ -201,14 +194,24 @@ function MODULE:InitServer()
             end
         end
 
+        local moneyTaken = false
+        if finalPrice > 0 and ply.TakeMoney then
+            ply:TakeMoney(finalPrice)
+            moneyTaken = true
+        end
+
         local ent = ents.Create(itemData.ent)
-        if not IsValid(ent) then 
-            Log("error", "Failed to create entity class: ", BW.Config.Colors.Cyan, tostring(itemData.ent), BW.Config.Colors.White, " for player ", BW.Config.Colors.Cyan, ply:Nick())
+        if not IsValid(ent) then
+            if moneyTaken and ply.AddMoney then ply:AddMoney(finalPrice) end
+
+            Log("error", "Failed to create entity class: " .. tostring(itemData.ent) .. " for player " .. ply:Nick())
             if ply.Notify then
                 ply:Notify(NOTIFY_ERROR, Translate("Shop.SpawnError","Server error: item entity configuration is invalid!"), 5)
             end
             return 
         end
+
+        ent.DeviceCost = finalPrice or 0
 
         local tr = ply:GetEyeTrace()
         local spawnPos = tr.HitPos
@@ -232,6 +235,10 @@ function MODULE:InitServer()
         if itemData.model then
             ent:SetModel(itemData.model)
         end
+        if ent.SetPlayer then ent:SetPlayer(ply) end
+        if ent.SetCPPIOwner then ent:SetCPPIOwner(ply) end
+        ent.Owner = ply
+        ent:SetNWEntity("Owner", ply)
 
         ent:Spawn()
         ent:Activate()
@@ -247,16 +254,7 @@ function MODULE:InitServer()
         if IsValid(phys) then
             phys:Wake()
         end
-
-        if ent.SetPlayer then ent:SetPlayer(ply) end
-        if ent.SetCPPIOwner then ent:SetCPPIOwner(ply) end
-        ent.Owner = ply
-        ent:SetNWEntity("Owner", ply)
         
-        if finalPrice > 0 and ply.TakeMoney then
-            ply:TakeMoney(finalPrice)
-        end
-
         if itemData.max and itemData.max > 0 then
             local currentCount = ply:GetNWInt("BW_ItemCount_" .. itemID, 0)
             ply:SetNWInt("BW_ItemCount_" .. itemID, currentCount + 1)

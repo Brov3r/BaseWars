@@ -36,27 +36,74 @@ function MODULE:RegisterBaseEntity()
     ENT.BoosterDuration = 30
 
     function ENT:Initialize()
-        self:PhysicsInit(SOLID_VPHYSICS)
-        self:SetMoveType(MOVETYPE_VPHYSICS)
-        self:SetSolid(SOLID_VPHYSICS)
         if SERVER then
-            self:SetUseType(SIMPLE_USE)
             self:SetModel("models/props_lab/jar01b.mdl")
-        end
+            
+            self:PhysicsInit(SOLID_VPHYSICS)
+            self:SetMoveType(MOVETYPE_VPHYSICS)
+            self:SetSolid(SOLID_VPHYSICS)
+            self:SetUseType(SIMPLE_USE)
 
-        if self.BoosterColor then
-            self:SetColor(self.BoosterColor)
-        end
+            if self.BoosterColor then
+                self:SetColor(self.BoosterColor)
+            end
 
-        local phys = self:GetPhysicsObject()
-        if IsValid(phys) then
-            phys:Wake()
+            local phys = self:GetPhysicsObject()
+            if IsValid(phys) then
+                phys:Wake()
+            end
+
+            local refundTime = BW and BW.Config and BW.Config.Economy.AutoRefundTime or 30
+            local entName = self.BoosterName or self.PrintName or self:GetClass()
+
+            timer.Simple(0, function()
+                if not IsValid(self) then return end
+                
+                local owner = self.Owner or self:GetNWEntity("Owner")
+                if IsValid(owner) and owner:IsPlayer() then
+                    owner:Notify(NOTIFY_WARNING, string.format(Translate("Entity.AutoRefunNotify", "You have %s sec. to use '%s', then it will be sold!"), refundTime, entName), 5)
+                end 
+            end)
+
+            timer.Simple(refundTime, function()
+                if not IsValid(self) then return end
+                if self.IsBeingSold or self.IsBeingRefunded then return end
+                
+                self.IsBeingRefunded = true
+
+                local owner = self.Owner or self:GetNWEntity("Owner")
+                local cost = self.DeviceCost or 0
+
+                if IsValid(owner) and owner:IsPlayer() and cost > 0 then
+                    local userGroup = owner:GetUserGroup()
+                    local groupConfig = BW and BW.Config and BW.Config.PlayerGroups and BW.Config.PlayerGroups[userGroup]
+                    
+                    local sellRatio = groupConfig and groupConfig.SellReturnRatio 
+                        or (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.SellReturnRatioDefault) 
+                        or 0.3
+
+                    local refundAmount = math.floor(cost * sellRatio)
+
+                    if refundAmount > 0 and owner.AddMoney then
+                        owner:AddMoney(refundAmount)
+                        
+                        local currency = (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.Currency) or "$"
+                        local formattedAmount = (BW and BW.Utils and BW.Utils.NumWithSep) and BW.Utils.NumWithSep(refundAmount) or refundAmount
+                        
+                        owner:Notify(NOTIFY_SUCCESS, string.format(Translate("Entity.RefundTime", "Your '%s' has expired and %s%s has been returned!"), entName, currency, formattedAmount), 5)
+                    end
+                end
+
+                self:Remove()
+            end)
         end
     end
 
     if SERVER then
         function ENT:Use(activator, caller)
             if not IsValid(activator) or not activator:IsPlayer() or not activator:Alive() then return end
+            
+            if self.IsBeingRefunded or self.IsBeingSold then return end
             
             MODULE:ConsumeBooster(activator, self.ClassName)
             self:Remove()

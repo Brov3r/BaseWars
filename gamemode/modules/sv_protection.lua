@@ -183,7 +183,7 @@ function MODULE:Init()
     end
 
     hook.Add("PhysgunPickup", "BW_Protection_GhostProp", function(ply, ent)
-        self:OnPhysgunPickup(ply, ent)
+        return self:OnPhysgunPickup(ply, ent)
     end)
 
     hook.Add("PhysgunDrop", "BW_Protection_UnghostProp", function(ply, ent)
@@ -267,6 +267,9 @@ function MODULE:OnPhysgunPickup(ply, ent)
     if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() then return end
 
     if ent:CreatedByMap() then return end
+
+    if ent.BlockPhysGun then return false  end
+
 
     local class = ent:GetClass()
     if string.match(class, "^func_") or string.match(class, "^trigger_") then return end

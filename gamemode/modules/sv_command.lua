@@ -146,6 +146,70 @@ function MODULE:RegisterDefaultCommands()
 
     end, "Send a report or feedback to administrators", false, 60)
 
+    self:AddCommand("sell", function(ply, args)
+        if not IsValid(ply) or not ply:Alive() then return end
+
+        local tr = ply:GetEyeTrace()
+        local ent = tr.Entity
+
+        if not IsValid(ent) or ent:IsPlayer() or ent:IsNPC() or ent:IsWorld() then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.Invalid", "Look at a valid object to sell!"), 5)
+            return
+        end
+
+        if ply:GetShootPos():DistToSqr(ent:GetPos()) > 250^2 then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.TooFar", "You are too far away from the object!"), 5)
+            return
+        end
+
+        local owner = ent.Owner or ent:GetNWEntity("Owner")
+        local isOwner = (ent.CPPIGetOwner and ent:CPPIGetOwner() == ply) or (owner == ply)
+        
+        if not isOwner then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NotYour", "This object does not belong to you!"), 5)
+            return
+        end
+
+        if ent.IsBeingSold then return end
+        ent.IsBeingSold = true
+
+        local cost = ent.DeviceCost or 0
+        if cost <= 0 then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NoValue", "This item has no value and cannot be sold."), 5)
+            ent.IsBeingSold = nil
+            return
+        end
+
+        local maxHealth = ent:GetMaxHealth()
+        local currentHealth = ent:Health()
+        local healthRatio = (maxHealth > 0) and math.Clamp(currentHealth / maxHealth, 0, 1) or 1
+
+        local userGroup = ply:GetUserGroup()
+        local groupConfig = BW and BW.Config and BW.Config.PlayerGroups and BW.Config.PlayerGroups[userGroup]
+        
+        local sellRatio = groupConfig and groupConfig.SellReturnRatio 
+            or (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.SellReturnRatioDefault) 
+            or 0.3
+
+        local refundAmount = math.floor((cost * healthRatio) * sellRatio)
+
+        if refundAmount > 0 and ply.AddMoney then
+            ply:AddMoney(refundAmount)
+        end
+
+        local entName = ent.PrintName or ent:GetClass()
+        if ent.GetTranslatedName then entName = ent:GetTranslatedName() end
+
+        local currency = (BW and BW.Config and BW.Config.Economy.Currency) or "$"
+        local formattedAmount = (BW and BW.Utils and BW.Utils.NumWithSep) and BW.Utils.NumWithSep(refundAmount) or refundAmount
+
+        local successMsg = string.format(Translate("Command.Sell.Success", "You successfully sold %s for %s%s!"), entName, currency, formattedAmount)
+
+        ply:Notify(NOTIFY_SUCCESS, successMsg, 5)
+        
+        ent:Remove()
+    end, "Sell the object you are looking at", false, 1)
+
     self:AddCommand("botsay", function(ply, args)
         local text = table.concat(args, " ")
         if text == "" then return end
