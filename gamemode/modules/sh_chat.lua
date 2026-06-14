@@ -21,7 +21,14 @@ function MODULE:ParseStringToChatArgs(str)
         local r = tonumber(string.sub(hex, 1, 2), 16)
         local g = tonumber(string.sub(hex, 3, 4), 16)
         local b = tonumber(string.sub(hex, 5, 6), 16)
-        table.insert(args, Color(r, g, b))
+        
+        -- Validate color values
+        if r and g and b then
+            r = math.Clamp(r or 0, 0, 255)
+            g = math.Clamp(g or 0, 0, 255)
+            b = math.Clamp(b or 0, 0, 255)
+            table.insert(args, Color(r, g, b))
+        end
         
         lastPos = pos
     end

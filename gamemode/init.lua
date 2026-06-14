@@ -11,9 +11,15 @@ end
 
 function GM:PlayerSpawn(ply)
     self.BaseClass.PlayerSpawn(self, ply)
-    ply:SetWalkSpeed(BW.Config.Motion.WalkSpeed)
-    ply:SetRunSpeed(BW.Config.Motion.RunSpeed)
-    ply:SetJumpPower(BW.Config.Motion.JumpPower)  
+    
+    -- Validate motion config values
+    local walkSpeed = math.max(1, BW.Config.Motion.WalkSpeed or 200)
+    local runSpeed = math.max(1, BW.Config.Motion.RunSpeed or 400)
+    local jumpPower = math.Clamp(BW.Config.Motion.JumpPower or 200, 0, 1000)
+    
+    ply:SetWalkSpeed(walkSpeed)
+    ply:SetRunSpeed(runSpeed)
+    ply:SetJumpPower(jumpPower)  
 end
 
 function GM:PlayerLoadout( ply )
@@ -23,11 +29,10 @@ function GM:PlayerLoadout( ply )
         end
     end
 
-    timer.Simple(0.1, function()
-        if IsValid(ply) then
-            ply:SelectWeapon("hands")
-        end
-    end)
+    -- Ensure player has hands weapon selected
+    if IsValid(ply) then
+        ply:SelectWeapon("hands")
+    end
     
     return true
 end
@@ -107,6 +112,9 @@ function GM:SetupMove(ply, mv, cmd)
     if BW.Config.Motion.EnableBHop and ply:IsOnGround() and cmd:KeyDown(IN_JUMP) then
         local vel = ply:GetVelocity()
         local jumpPower = BW.Config.Motion.JumpPower or 200
+        
+        -- Validate jump power to prevent exploits
+        jumpPower = math.Clamp(jumpPower, 0, 1000)
 
         mv:SetVelocity(Vector(vel.x, vel.y, jumpPower))
         ply:SetGroundEntity(NULL)

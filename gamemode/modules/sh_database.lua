@@ -40,7 +40,7 @@ local PLAYER = FindMetaTable("Player")
 function PLAYER:HasPrivilege()
     if self:IsAdmin() or self:IsSuperAdmin() then return true end
     local groupData = BW.Config and BW.Config.PlayerGroups and BW.Config.PlayerGroups[self:GetUserGroup()]
-    return groupData and groupData.Privilege == true or false
+    return (groupData and groupData.Privilege == true) or false
 end
 
 function PLAYER:GetMaxXP(inputLevel)
@@ -50,8 +50,13 @@ end
 
 if SERVER then
     function PLAYER:PostSetXP(oldValue, newValue)
+        -- Prevent infinite recursion
+        if self._UpdatingLevel then return end
+        
         local maxXP = self:GetMaxXP()
         if newValue >= maxXP then
+            self._UpdatingLevel = true
+            
             local level = self:GetLevel()
             local remainder = newValue
             
@@ -64,6 +69,8 @@ if SERVER then
             
             self:SetLevel(level)
             self:SetXP(remainder, true)
+            
+            self._UpdatingLevel = false
         end
     end
 end
@@ -99,7 +106,9 @@ function MODULE:Init()
         -- [HAS]
         if methods.has ~= false and (statType == "Int" or statType == "Float") then
             PLAYER["Has" .. key] = function(ply, amount)
-                return ply["Get" .. key](ply) >= (tonumber(amount) or 0)
+                local amountNum = tonumber(amount)
+                if not amountNum then return false end
+                return ply["Get" .. key](ply) >= amountNum
             end
         end
 
@@ -191,6 +200,12 @@ end
 if SERVER then
 	function MODULE:SyncDatabaseSchema()
 		local tblName = self.DataBaseName
+		-- Validate table name (alphanumeric and underscore only)
+		if not string.match(tblName, "^[a-zA-Z0-9_]+$") then
+			Log("error", "Database: Invalid table name '" .. tblName .. "'")
+			return
+		end
+		
 		local currentColumns = sql.Query("PRAGMA table_info(" .. tblName .. ");") or {}
 		local existingCols = {}
 		
@@ -200,12 +215,27 @@ if SERVER then
 
 		for key, data in pairs(self.Stats) do
 			if not existingCols[key] then
+				-- Validate column name (alphanumeric and underscore only)
+				if not string.match(key, "^[a-zA-Z0-9_]+$") then
+					Log("error", "Database: Invalid column name '" .. key .. "'")
+					continue
+				end
+				
 				local sqlType = GetSQLType(data.type)
+				
+				-- Get default value safely
+				local defaultVal = (type(data.default) == "function" and data.default()) or data.default or 0
+				if type(defaultVal) == "string" then
+					defaultVal = sql.SQLStr(defaultVal)
+				else
+					defaultVal = tostring(defaultVal)
+				end
+				
 				local query = string.format("ALTER TABLE %s ADD COLUMN %s %s DEFAULT %s;", 
 					tblName, 
 					key, 
 					sqlType, 
-					(type(data.default) == "function" and data.default()) or data.default or 0
+					defaultVal
 				)
 				
 				local err = sql.Query(query)
@@ -220,11 +250,23 @@ if SERVER then
 
     function MODULE:InitServerDatabase()
 		local tblName = self.DataBaseName
+		
+		-- Validate table name
+		if not string.match(tblName, "^[a-zA-Z0-9_]+$") then
+			ErrorNoHaltWithStack("[BW DB] Invalid table name: " .. tblName)
+			return
+		end
+		
         local query = "CREATE TABLE IF NOT EXISTS " .. tblName .. " (SteamID64 VARCHAR(25) PRIMARY KEY"
         
 		self:SyncDatabaseSchema()
         
         for k, v in pairs(self.Stats) do
+			-- Validate column name
+			if not string.match(k, "^[a-zA-Z0-9_]+$") then
+				Log("error", "Database: Invalid column name '" .. k .. "', skipping")
+				continue
+			end
             query = query .. ", " .. k .. " " .. GetSQLType(v.type)
         end
         
@@ -247,10 +289,18 @@ if SERVER then
 
             local updates = {}
             for k, _ in pairs(self.BW_DirtyStats) do
+                -- Validate column name to prevent SQL injection
+                if not string.match(k, "^[a-zA-Z0-9_]+$") then
+                    Log("error", "SaveStats: Invalid column name '" .. k .. "', skipping")
+                    continue
+                end
+                
                 local val = self["Get" .. k](self)
                 local sqlVal = type(val) == "string" and sql.SQLStr(val) or tostring(val or 0)
                 table.insert(updates, k .. " = " .. sqlVal)
             end
+            
+            if #updates == 0 then return end
             
             local err = sql.Query("UPDATE " .. tblName .. " SET " .. table.concat(updates, ", ") .. " WHERE SteamID64 = " .. sql.SQLStr(steamID) .. ";")
             if err then
@@ -317,6 +367,9 @@ if SERVER then
         end)
         
         hook.Add("ShutDown", "BW_DB_SaveAll", function() 
+            timer.Remove("BW_DB_AutoSave")
+            timer.Remove("BW_DB_PlaytimeTracker")
+            
             sql.Begin()
             for _, p in ipairs(player.GetAll()) do 
                 if IsValid(p) and not p:IsBot() then 
