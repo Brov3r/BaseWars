@@ -29,6 +29,7 @@ function MODULE:RegisterBaseEntity()
     ENT.PrintName = Translate("Booster.BaseBooster", "Unknown")
     ENT.Author = "Brov3r"
     ENT.Spawnable = false
+    ENT.BlockPhysGun = true 
 
     ENT.BoosterName     = Translate("Booster.BaseBooster", "Unknown")
     ENT.BoosterIcon     = "icon16/pill.png"

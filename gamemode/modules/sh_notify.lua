@@ -210,17 +210,22 @@ function MODULE:CalculateNotificationSize(notif)
     surface.SetFont("Inter16Thin")
     local maxWidth = 300
     local lines = self:WrapText(notif.text, maxWidth)
-
     notif.lines = lines
-    local lineHeight = 20
-    notif.textHeight = #lines * lineHeight
-
+    
     local maxLineW = 0
     for _, line in ipairs(lines) do
         local w = surface.GetTextSize(line)
         if w > maxLineW then maxLineW = w end
     end
-    notif.width = math.Clamp(maxLineW + 70, 150, 400)
+
+    surface.SetFont("Inter18")
+    local typeW, _ = surface.GetTextSize(notif.typeName)
+
+    local minWidthFromContent = math.max(typeW, maxLineW) + 58 + 20
+    
+    notif.width = math.Clamp(minWidthFromContent, 200, 400)
+    
+    notif.textHeight = #lines * 18
     notif.height = 40 + notif.textHeight
     notif.calculatedSize = true
 end
