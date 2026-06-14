@@ -10,21 +10,6 @@ function MODULE:Init()
     if not ULib or not ulx then return end
     self:AddCommands()
 
-    if SERVER then
-        util.AddNetworkString("BW_XGUI_RequestReports")
-        util.AddNetworkString("BW_XGUI_SendReports")
-
-        net.Receive("BW_XGUI_RequestReports", function(len, ply)
-            if not IsValid(ply) or not ply:IsAdmin() then return end
-
-            local data = sql.Query("SELECT * FROM bw_reports ORDER BY id DESC LIMIT 150") or {}
-            
-            net.Start("BW_XGUI_SendReports")
-                net.WriteTable(data)
-            net.Send(ply)
-        end)
-    end
-
     if CLIENT then
         self:AddXGUITab()
     end
@@ -175,66 +160,6 @@ function MODULE:AddXGUITab()
         refreshPlayerStats()
 
         xgui.addModule("Stats", xpanel, "icon16/application_view_detail.png", "ulx addmoney")
-
-        -- =========================================================================
-        -- UI: Reports Tab
-        -- =========================================================================
-        local rpanel = vgui.Create("DPanel")
-        rpanel:SetPaintBackground(false)
-
-        local rTopBar = vgui.Create("DPanel", rpanel)
-        rTopBar:Dock(TOP)
-        rTopBar:SetTall(30)
-        rTopBar:DockMargin(5, 5, 5, 5)
-        rTopBar:SetPaintBackground(false)
-
-        local btnRRefresh = vgui.Create("DButton", rTopBar)
-        btnRRefresh:Dock(LEFT)
-        btnRRefresh:SetText("Refresh")
-        btnRRefresh:SetWide(100)
-        btnRRefresh:SetIcon("icon16/arrow_refresh.png")
-
-        local rList = vgui.Create("DListView", rpanel)
-        rList:Dock(FILL)
-        rList:DockMargin(5, 0, 5, 5)
-        rList:SetMultiSelect(false)
-
-        rList:AddColumn("ID"):SetMaxWidth(60)
-        rList:AddColumn("Date"):SetMinWidth(110)
-        rList:AddColumn("Player Name"):SetMinWidth(120)
-        rList:AddColumn("SteamID"):SetMinWidth(120)
-        rList:AddColumn("Message"):SetMinWidth(190)
-
-        local function requestReports()
-            if not IsValid(rList) then return end
-            rList:Clear()
-            net.Start("BW_XGUI_RequestReports")
-            net.SendToServer()
-        end
-
-        btnRRefresh.DoClick = requestReports
-
-        net.Receive("BW_XGUI_SendReports", function()
-            if not IsValid(rList) then return end
-            local data = net.ReadTable()
-
-            rList:Clear()
-            for _, report in ipairs(data) do
-                local dateStr = os.date("%d.%m.%Y %H:%M", tonumber(report.timestamp) or 0)
-                rList:AddLine(
-                    report.id,
-                    dateStr,
-                    report.name,
-                    report.steamid,
-                    report.text
-                )
-            end
-        end)
-
-        rpanel.UpdateContent = requestReports
-        requestReports()
-
-        xgui.addModule("Reports", rpanel, "icon16/report_magnify.png", "ulx addmoney")
     end
 
     if xgui then
