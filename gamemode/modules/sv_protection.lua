@@ -29,6 +29,7 @@ end
 function MODULE:HasEntities(ply)
     if not IsValid(ply) then return false end
 
+    -- First check: Use built-in GetCount if available (most efficient)
     if ply.GetCount then
         local props    = ply:GetCount("props") or 0
         local sents    = ply:GetCount("sents") or 0
@@ -40,7 +41,9 @@ function MODULE:HasEntities(ply)
         end
     end
 
+    -- Second check: Only use CPPI if GetCount didn't find anything
     if CPPI then
+        -- Check physics props first (most common case)
         local physicsProps = ents.FindByClass("prop_physics")
         for i = 1, #physicsProps do
             local ent = physicsProps[i]
@@ -49,11 +52,16 @@ function MODULE:HasEntities(ply)
             end
         end
 
+        -- Check other entities with optimized filtering
         local allEnts = ents.GetAll()
-        for i = 1, #allEnts do
+        local entCount = #allEnts
+        
+        for i = 1, entCount do
             local ent = allEnts[i]
             
-            if not IsValid(ent) or ent == ply or ent:IsPlayer() or ent:IsNPC() or ent:IsWeapon() then continue end
+            -- Skip invalid, self, players, NPCs, weapons (common cases first)
+            if not IsValid(ent) or ent:IsPlayer() or ent:IsNPC() or ent:IsWeapon() then continue end
+            if ent == ply then continue end
             
             if ent.CPPIGetOwner and ent:CPPIGetOwner() == ply then
                 local class = ent:GetClass()

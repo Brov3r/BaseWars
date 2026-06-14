@@ -45,6 +45,9 @@ function ENT:GetRefundData(ply)
     if not sellRatio then
         sellRatio = GetBWConfig(function() return BW.Config.Economy.SellReturnRatioDefault end, 0.3)
     end
+    
+    -- Validate sell ratio to ensure it's between 0 and 1
+    sellRatio = math.Clamp(tonumber(sellRatio) or 0.3, 0, 1)
 
     local currency = GetBWConfig(function() return BW.Config.Economy.Currency end, "$")
 

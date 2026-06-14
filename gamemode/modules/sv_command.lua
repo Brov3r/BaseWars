@@ -106,8 +106,7 @@ function MODULE:RegisterDefaultCommands()
         end
 
         if string.len(reportText) > 500 then
-            ply:Notify(NOTIFY_ERROR, Translate("Command.Report.TooLong", "Your report is too long! Max 500 characters."), 5)
-            return
+            reportText = string.sub(reportText, 1, 500)
         end
 
         local safeText = sql.SQLStr(reportText)
@@ -133,13 +132,17 @@ function MODULE:RegisterDefaultCommands()
 
         for _, admin in ipairs(player.GetAll()) do
             if admin:IsAdmin() or admin:IsSuperAdmin() then
-                local text = string.format(Translate("Command.Report.AdminMsg", "<#5FF05F>[REPORT] <#FFA500>Player <#00FFFF>%s <#FFA500>(<#00FFFF>%s<#FFA500>) sent a report: <#00FFFF>%s"), ply:Nick(), ply:SteamID(), reportText)
+                -- Sanitize report text to prevent HTML injection
+                local sanitizedText = string.gsub(reportText, "<", "&lt;")
+                sanitizedText = string.gsub(sanitizedText, ">", "&gt;")
+                
+                local text = string.format(Translate("Command.Report.AdminMsg", "<#5FF05F>[REPORT] <#FFA500>Player <#00FFFF>%s <#FFA500>(<#00FFFF>%s<#FFA500>) sent a report: <#00FFFF>%s"), ply:Nick(), ply:SteamID(), sanitizedText)
 				
 				net.Start("BW_CustomChat_Message")
                 net.WriteEntity(nil)
                 net.WriteString(text)
                 net.WriteBool(false)
-                net.WriteBool(false )
+                net.WriteBool(false)
                 net.Send(admin)
             end
         end
@@ -162,6 +165,7 @@ function MODULE:RegisterDefaultCommands()
             return
         end
 
+        -- First ownership check
         local owner = ent.Owner or ent:GetNWEntity("Owner")
         local isOwner = (ent.CPPIGetOwner and ent:CPPIGetOwner() == ply) or (owner == ply)
         
@@ -176,6 +180,17 @@ function MODULE:RegisterDefaultCommands()
         local cost = ent.DeviceCost or 0
         if cost <= 0 then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NoValue", "This item has no value and cannot be sold."), 5)
+            ent.IsBeingSold = nil
+            return
+        end
+
+        -- Verify entity still exists and player still owns it before processing
+        if not IsValid(ent) then return end
+        owner = ent.Owner or ent:GetNWEntity("Owner")
+        isOwner = (ent.CPPIGetOwner and ent:CPPIGetOwner() == ply) or (owner == ply)
+        
+        if not isOwner then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NotYour", "This object does not belong to you!"), 5)
             ent.IsBeingSold = nil
             return
         end
@@ -207,7 +222,10 @@ function MODULE:RegisterDefaultCommands()
 
         ply:Notify(NOTIFY_SUCCESS, successMsg, 5)
         
-        ent:Remove()
+        -- Final check before removing
+        if IsValid(ent) then
+            ent:Remove()
+        end
     end, "Sell the object you are looking at", false, 1)
 
     self:AddCommand("botsay", function(ply, args)
@@ -224,15 +242,15 @@ function MODULE:RegisterDefaultCommands()
         if not IsValid(activeWep) then return end
         
         local wepClass = activeWep:GetClass()
+        if not wepClass or wepClass == "" then return end
+        
         if LoadoutCheck[wepClass] then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Drop.Error", "You can't throw away this weapon!"), 5)
             return
         end
 
         local ammoType = activeWep:GetPrimaryAmmoType()
-        local ammoCount = ply:GetAmmoCount(ammoType)
-
-        ply:StripWeapon(wepClass)
+        local ammoCount = math.max(0, ply:GetAmmoCount(ammoType))
 
         local ent = ents.Create("spawned_weapon")
         if not IsValid(ent) then return end
@@ -243,6 +261,9 @@ function MODULE:RegisterDefaultCommands()
         ent:SetPos(pos)
         ent:SetWeaponClass(wepClass)
         ent:Spawn()
+        
+        -- Only strip weapon after entity is created and spawned
+        ply:StripWeapon(wepClass)
         
         if ammoType ~= -1 and ammoCount > 0 then
             ent:SetAmmoCount(ammoCount)
@@ -262,13 +283,18 @@ function MODULE:RegisterDefaultCommands()
             ply:Notify(NOTIFY_ERROR, Translate("Command.DropMoney.Hint", "Usage: /dropmoney [amount]"), 5)
             return
         end
+        
+        -- Ensure amount is an integer
+        amount = math.floor(amount)
+        if amount <= 0 then
+            ply:Notify(NOTIFY_ERROR, Translate("Command.DropMoney.Hint", "Usage: /dropmoney [amount]"), 5)
+            return
+        end
 
         if not ply:HasMoney(amount) then
             ply:Notify(NOTIFY_ERROR, Translate("Command.DropMoney.NoMoney", "You don't have enough money!"), 5)
             return
         end
-
-        ply:TakeMoney(amount)
 
         local ent = ents.Create("spawned_money")
         if not IsValid(ent) then return end
@@ -280,6 +306,9 @@ function MODULE:RegisterDefaultCommands()
         ent:SetPos(pos)
         ent:Spawn()
         ent:Activate()
+        
+        -- Only take money after entity is created and spawned
+        ply:TakeMoney(amount)
 
         local phys = ent:GetPhysicsObject()
         if IsValid(phys) then
