@@ -1,5 +1,24 @@
 local ITEM_PANEL = {}
 
+local function GetWrappedHeight(text, font, width)
+    surface.SetFont(font)
+    local lineHeight = select(2, surface.GetTextSize("A")) or 16
+    local lines = 1
+    local current = ""
+
+    for word in tostring(text or ""):gmatch("%S+") do
+        local candidate = current == "" and word or current .. " " .. word
+        if current ~= "" and surface.GetTextSize(candidate) > width then
+            lines = lines + 1
+            current = word
+        else
+            current = candidate
+        end
+    end
+
+    return lines * lineHeight + 2
+end
+
 function ITEM_PANEL:Init()
     self:SetSize(70, 70)
     self:SetText("") 
@@ -40,15 +59,15 @@ function ITEM_PANEL:OnCursorEntered()
     lblName:SizeToContents()
     table.insert(labels, lblName)
     
+    local descLabel
     if data.desc then
-        local lblDesc = vgui.Create("DLabel", tip)
-        lblDesc:SetText(Translate(data.desc, data.desc))
-        lblDesc:SetFont("Inter12")
-        lblDesc:SetTextColor(c.LightGray or Color(200, 200, 200))
-        lblDesc:SetWrap(true)
-        lblDesc:SetWide(200)
-        lblDesc:SizeToContentsY()
-        table.insert(labels, lblDesc)
+        descLabel = vgui.Create("DLabel", tip)
+        descLabel:SetText(Translate(data.desc, data.desc))
+        descLabel:SetFont("Inter12")
+        descLabel:SetTextColor(c.LightGray or Color(200, 200, 200))
+        descLabel:SetWrap(true)
+        descLabel:SetWide(200)
+        table.insert(labels, descLabel)
     end
     
     local basePrice = data.price or 0
@@ -103,14 +122,11 @@ function ITEM_PANEL:OnCursorEntered()
         end
     end
     
-    if data.desc then
-        maxWidth = 220 
-        for _, lbl in ipairs(labels) do
-            if lbl:GetWrap() then 
-                lbl:SetWide(maxWidth - (padding * 2)) 
-                lbl:SizeToContentsY() 
-            end
-        end
+    if descLabel then
+        maxWidth = 220
+        local descWidth = maxWidth - (padding * 2)
+        descLabel:SetWide(descWidth)
+        descLabel:SetTall(GetWrappedHeight(descLabel:GetText(), "Inter12", descWidth))
     end
     
     for _, lbl in ipairs(labels) do

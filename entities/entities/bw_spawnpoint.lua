@@ -3,19 +3,24 @@ if SERVER then
 end
 
 ENT.Type = "anim"
-ENT.Base = "bw_base" 
+ENT.Base = "bw_power_consumer"
 ENT.PrintName = "Spawn Point"
 ENT.ID = "spawnpoint"
 ENT.Spawnable = true
 ENT.BlockPhysGun = true 
 
 ENT.DefaultMaxHealth = 200
+ENT.EnergyCapacity = 100
+ENT.EnergyRequired = 10
+ENT.EnergyConsumption = 1
+
+DEFINE_BASECLASS("bw_power_consumer")
 
 if SERVER then
 
     function ENT:Initialize()
         self:SetModel("models/props_trainstation/trainstation_clock001.mdl")
-        self.BaseClass.Initialize(self)
+        BaseClass.Initialize(self)
         
         self:SetUseType(SIMPLE_USE)
         
@@ -52,6 +57,17 @@ if SERVER then
 
     function ENT:Use(activator, caller)
         if not IsValid(activator) or not activator:IsPlayer() then return end
+
+        if not self:IsPowered() then
+            if type(activator.Notify) == "function" then
+                activator:Notify(
+                    NOTIFY_WARNING,
+                    Translate("Power.SpawnPointNoPower", "The spawn point has no power."),
+                    5
+                )
+            end
+            return
+        end
         
         if activator.BW_LinkedSpawn == self then return end
         
@@ -71,6 +87,17 @@ if SERVER then
             local spawnEnt = ply.BW_LinkedSpawn
             
             if IsValid(spawnEnt) then
+                if type(spawnEnt.IsPowered) ~= "function" or not spawnEnt:IsPowered() then
+                    if type(ply.Notify) == "function" then
+                        ply:Notify(
+                            NOTIFY_WARNING,
+                            Translate("Power.SpawnPointNoPower", "The spawn point has no power."),
+                            5
+                        )
+                    end
+                    return
+                end
+
                 local targetPos = spawnEnt:GetPos() + Vector(0, 0, 20)
                 
                 local tr = util.TraceHull({
@@ -95,8 +122,8 @@ if SERVER then
     end)
 
     function ENT:OnRemove()
-        if self.BaseClass.OnRemove then
-            self.BaseClass.OnRemove(self)
+        if type(BaseClass.OnRemove) == "function" then
+            BaseClass.OnRemove(self)
         end
     end
 end

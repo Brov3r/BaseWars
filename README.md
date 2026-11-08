@@ -25,6 +25,7 @@ All settings are in [`gamemode/config.lua`](./gamemode/config.lua).
 | `Map.RemoveDoors`, `Map.RemoveGlass` | Remove map doors and glass |
 | `MapZones.Default` | Damage above and below height limits |
 | `Economy.MaxMoney` | Maximum player balance |
+| `Power` | Generator storage/output/radius and consumer energy requirements |
 | `Ownership.RemoveOnDisconnect` | Remove owned entities on disconnect |
 | `CPPI` | Optional prop access layer: friend access and admin tools |
 | `Notify` | Notification queue, opacity and sound |

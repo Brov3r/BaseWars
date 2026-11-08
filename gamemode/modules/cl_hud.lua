@@ -8,6 +8,7 @@ local lvlIcon = Material("icon16/award_star_gold_3.png")
 local iconRepUp   = Material("icon16/thumb_up.png")
 local iconRepDown = Material("icon16/thumb_down.png")
 local heartMat = Material("icon16/heart.png")
+local powerMat = Material("icon16/lightning.png")
 local config   = BW.Config
 local hud      = config.HUD
 local colors   = config.Colors
@@ -377,6 +378,23 @@ function MODULE:DrawEntInfo()
     end
 end
 
+local function FormatEnergy(value)
+    if BW.Power and type(BW.Power.FormatEnergy) == "function" then
+        return BW.Power.FormatEnergy(value)
+    end
+    return tostring(math.floor(tonumber(value) or 0))
+end
+
+local function GetPowerInfo(ent)
+    if not IsValid(ent) or type(ent.GetNWFloat) ~= "function" then return nil end
+
+    local capacity = tonumber(ent:GetNWFloat("BW_PowerCapacity", 0)) or 0
+    if capacity <= 0 then return nil end
+
+    local stored = math.max(0, tonumber(ent:GetNWFloat("BW_PowerStored", 0)) or 0)
+    return math.min(stored, capacity), capacity
+end
+
 function MODULE:DrawTargetInfo(targetEnt, alpha)
     local ply = LocalPlayer()
     if not IsValid(targetEnt) or alpha < 0.01 then return end
@@ -463,6 +481,23 @@ function MODULE:DrawTargetInfo(targetEnt, alpha)
            
             BW.Utils.DrawShadowedText(ownerString, textFont, barX, barY - 2, textColor, shadowColor, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_BOTTOM)
             BW.Utils.DrawShadowedText(hpString, textFont, barX + barW - iconSize - iconGap, barY - 2, textColor, shadowColor, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_BOTTOM)
+
+            local powerStored, powerCapacity = GetPowerInfo(targetEnt)
+            if powerCapacity then
+                local energyBarY = barY + barH + 7
+                local energyBarH = 4
+                local energyTextY = energyBarY + energyBarH + 2
+                local energyString = FormatEnergy(powerStored) .. "/" .. FormatEnergy(powerCapacity)
+
+                BW.Utils.DrawProgressBar(barX, energyBarY, barW, energyBarH,
+                    powerStored, 0, powerCapacity, GetAlphaColor(colors.Cyan), barBgColor)
+
+                surface.SetMaterial(powerMat)
+                surface.SetDrawColor(255, 255, 255, alphaByte)
+                surface.DrawTexturedRect(iconX, energyTextY, iconSize, iconSize)
+                BW.Utils.DrawShadowedText(energyString, textFont, iconX - iconGap, energyTextY,
+                    textColor, shadowColor, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+            end
         else
             local ownerString = string.format("%s: %s", Translate("HUD.OwnerLabel", "Owner"), BW.Utils.TruncateText(ownerName, textFont, 120))
             

@@ -17,6 +17,11 @@ function MODULE:CanRunCommand(ply, cmdName)
         return false
     end
 
+    if cmdData.superAdminOnly and not ply:IsSuperAdmin() then
+        ply:Notify(NOTIFY_ERROR, Translate("Command.SuperAdminOnly", "This command is available only to superadmins."), 5)
+        return false
+    end
+
     if cmdData.cooldown > 0 then
         local sid = ply:SteamID64()
         
@@ -35,14 +40,15 @@ function MODULE:CanRunCommand(ply, cmdName)
     return true
 end
 
-function MODULE:AddCommand(cmdName, callback, description, adminOnly, cooldown)
+function MODULE:AddCommand(cmdName, callback, description, adminOnly, cooldown, superAdminOnly)
     local name = string.lower(cmdName)
     
     self.Commands[name] = {
         callback = callback,
         description = description or "No description",
         adminOnly = adminOnly or false,
-        cooldown = cooldown or 0
+        cooldown = cooldown or 0,
+        superAdminOnly = superAdminOnly or false
     }
 
     concommand.Add(name, function(ply, cmd, args, fullStr)
@@ -77,6 +83,185 @@ function MODULE:Init()
     end)
 
     self:RegisterDefaultCommands()
+end
+
+local STAT_ALIASES = {
+    money = "Money",
+    cash = "Money",
+    balance = "Money",
+    lvl = "Level",
+    level = "Level",
+    xp = "XP",
+    exp = "XP",
+    rep = "Reputation",
+    reputation = "Reputation",
+}
+
+local function FindStat(query)
+    query = tostring(query or ""):lower()
+    local stats = BW.Modules.database and BW.Modules.database.Stats or {}
+    for key in pairs(stats) do
+        if key:lower() == query then return key end
+    end
+    return STAT_ALIASES[query]
+end
+
+local function FormatStatValue(stat, value)
+    value = tonumber(value) or 0
+    if stat == "Money" then
+        return (BW.Config.Economy.Currency or "$") .. BW.Utils.NumWithSep(value)
+    end
+    return BW.Utils.NumWithSep(value)
+end
+
+function MODULE:FindPlayer(query)
+    query = tostring(query or ""):Trim()
+    if query == "" then return end
+
+    local lower = query:lower()
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:SteamID64() == query or ply:SteamID() == query
+            or tostring(ply:UserID()) == query or ply:Nick():lower() == lower then
+            return ply
+        end
+    end
+
+    for _, ply in ipairs(player.GetAll()) do
+        if ply:Nick():lower():find(lower, 1, true) then return ply end
+    end
+end
+
+function MODULE:NotifyCommandResult(ply, kind, text)
+    if IsValid(ply) and ply.Notify then ply:Notify(kind, text, 6) end
+end
+
+function MODULE:ChangePlayerStat(ply, target, stat, mode, value)
+    if not IsValid(target) or not target:IsPlayer() then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.TargetNotFound", "Player not found."))
+        return false
+    end
+    if not target:IsBot() and not target.BW_StatsLoaded then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.StatsNotLoaded", "Player data is not loaded yet."))
+        return false
+    end
+
+    local info = BW.Modules.database and BW.Modules.database.Stats[stat]
+    if not info then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.StatNotFound", "Unknown stat."))
+        return false
+    end
+
+    local methodName = mode == "add" and "Add" or (mode == "take" and "Take" or "Set")
+    if (info.methods and info.methods[methodName:lower()] == false) or type(target[methodName .. stat]) ~= "function" then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.StatReadOnly", "This stat cannot be changed."))
+        return false
+    end
+
+    value = tonumber(value)
+    if not BW.Utils.IsFinite(value) then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.InvalidValue", "Enter a valid number."))
+        return false
+    end
+    if mode ~= "set" and value <= 0 then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.InvalidValue", "Enter a valid number."))
+        return false
+    end
+
+    local oldValue = target["Get" .. stat](target)
+    local ok = target[methodName .. stat](target, value)
+    if ok == false then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.ChangeFailed", "Could not change this stat."))
+        return false
+    end
+    local newValue = target["Get" .. stat](target)
+
+    local statLabel = Translate("Command.Stat." .. stat, stat)
+    local oldText, newText = FormatStatValue(stat, oldValue), FormatStatValue(stat, newValue)
+    local adminText = string.format(
+        Translate("Command.Admin.Changed", "Changed %s for %s: %s -> %s."),
+        statLabel,
+        target:Nick(),
+        oldText,
+        newText
+    )
+    self:NotifyCommandResult(ply, NOTIFY_SUCCESS, adminText)
+
+    if IsValid(target) and target.Notify then
+        target:Notify(NOTIFY_INFO, string.format(
+            Translate("Command.Admin.Received", "An administrator changed your %s: %s -> %s."),
+            statLabel,
+            oldText,
+            newText
+        ), 6)
+    end
+
+    Log("warn", "[Admin]", IsValid(ply) and ply:Nick() or "Console", methodName, stat, target:Nick(), oldText, "->", newText)
+    return true
+end
+
+function MODULE:AdminChangeStat(ply, args, stat, mode)
+    if #args < 2 then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, string.format(
+            Translate("Command.Admin.Usage", "Usage: /%s <player> <value>"),
+            mode .. stat:lower()
+        ))
+        return
+    end
+
+    local value = args[#args]
+    local targetQuery = table.concat(args, " ", 1, #args - 1)
+    local target = self:FindPlayer(targetQuery)
+    self:ChangePlayerStat(ply, target, stat, mode, value)
+end
+
+function MODULE:AdminChangeStatGeneric(ply, args, mode)
+    if #args < 3 then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, string.format(
+            Translate("Command.Admin.UsageStat", "Usage: /%sstat <player> <stat> <value>"),
+            mode
+        ))
+        return
+    end
+
+    local value = args[#args]
+    local stat = FindStat(args[#args - 1])
+    local targetQuery = table.concat(args, " ", 1, #args - 2)
+    if not stat then
+        self:NotifyCommandResult(ply, NOTIFY_ERROR, Translate("Command.Admin.StatNotFound", "Unknown stat."))
+        return
+    end
+
+    local target = self:FindPlayer(targetQuery)
+    self:ChangePlayerStat(ply, target, stat, mode, value)
+end
+
+function MODULE:RegisterStatCommands()
+    local commands = {
+        {stat = "Money",      name = "addmoney",  mode = "add",  description = "Give money to a player"},
+        {stat = "Money",      name = "takemoney", mode = "take", description = "Take money from a player"},
+        {stat = "Money",      name = "setmoney",  mode = "set",  description = "Set a player's money"},
+        {stat = "Level",      name = "addlevel",  mode = "add",  description = "Give levels to a player"},
+        {stat = "Level",      name = "takelevel", mode = "take", description = "Take levels from a player"},
+        {stat = "Level",      name = "setlevel",  mode = "set",  description = "Set a player's level"},
+        {stat = "XP",         name = "addxp",     mode = "add",  description = "Give XP to a player"},
+        {stat = "XP",         name = "takexp",    mode = "take", description = "Take XP from a player"},
+        {stat = "XP",         name = "setxp",     mode = "set",  description = "Set a player's XP"},
+        {stat = "Reputation", name = "addrep",    mode = "add",  description = "Give reputation to a player"},
+        {stat = "Reputation", name = "takerep",   mode = "take", description = "Take reputation from a player"},
+        {stat = "Reputation", name = "setrep",    mode = "set",  description = "Set a player's reputation"},
+    }
+
+    for _, command in ipairs(commands) do
+        self:AddCommand(command.name, function(ply, args)
+            self:AdminChangeStat(ply, args, command.stat, command.mode)
+        end, command.description, false, 0, true)
+    end
+
+    for _, mode in ipairs({"add", "take", "set"}) do
+        self:AddCommand(mode .. "stat", function(ply, args)
+            self:AdminChangeStatGeneric(ply, args, mode)
+        end, mode .. " any player stat", false, 0, true)
+    end
 end
 
 function MODULE:RegisterDefaultCommands()
@@ -258,4 +443,6 @@ function MODULE:RegisterDefaultCommands()
 
         ply:Notify(NOTIFY_SUCCESS, string.format(Translate("Command.DropMoney.Success", "You've thrown away %s%s!"),BW.Config.Economy.Currency, amount), 5)
     end, "Throw the money on the floor", false, 5)
+
+    self:RegisterStatCommands()
 end

@@ -108,7 +108,7 @@ function MODULE:RegisterBaseEntity()
             
             if self.IsBeingRefunded or self.IsBeingSold then return end
             
-            MODULE:ConsumeBooster(activator, self.ClassName)
+            MODULE:ConsumeBooster(activator, self:GetClass())
             self:Remove()
         end
     end
@@ -166,22 +166,35 @@ function MODULE:RegisterCustomBoosters()
 
     self:AddBooster("bw_booster_speed", Translate("Booster.Speed", "Speed Boost"), "icon16/lightning.png", Color(255, 215, 0), 60,
     function(ply)
+        local motion = BW.Config.Motion or {}
+        local multiplier = tonumber(motion.SpeedBoostMultiplier) or 1.67
+
         if SERVER then
-            if not ply.BW_HasSpeed then 
+            if not ply.BW_HasSpeed then
                 ply.BW_PreBoosterWalk = ply:GetWalkSpeed()
                 ply.BW_PreBoosterRun = ply:GetRunSpeed()
-                ply:SetWalkSpeed(ply.BW_PreBoosterWalk * 1.45)
-                ply:SetRunSpeed(ply.BW_PreBoosterRun * 1.45)
+                if not ply.BW_PreBoosterWalk or ply.BW_PreBoosterWalk <= 0 then
+                    ply.BW_PreBoosterWalk = motion.WalkSpeed or 125
+                end
+                if not ply.BW_PreBoosterRun or ply.BW_PreBoosterRun <= 0 then
+                    ply.BW_PreBoosterRun = motion.RunSpeed or 250
+                end
+                ply:SetWalkSpeed(ply.BW_PreBoosterWalk * multiplier)
+                ply:SetRunSpeed(ply.BW_PreBoosterRun * multiplier)
             end
         end
         ply.BW_HasSpeed = true
     end,
     function(ply)
-        if SERVER and IsValid(ply) and ply:Alive() then
-            ply:SetWalkSpeed(ply.BW_PreBoosterWalk or 200)
-            ply:SetRunSpeed(ply.BW_PreBoosterRun or 400)
+        local motion = BW.Config.Motion or {}
+
+        if SERVER and IsValid(ply) then
+            ply:SetWalkSpeed(ply.BW_PreBoosterWalk or motion.WalkSpeed or 125)
+            ply:SetRunSpeed(ply.BW_PreBoosterRun or motion.RunSpeed or 250)
         end
         ply.BW_HasSpeed = false
+        ply.BW_PreBoosterWalk = nil
+        ply.BW_PreBoosterRun = nil
     end)
 
     self:AddBooster("bw_booster_painkiller", Translate("Booster.Painkiller", "Painkiller"), "icon16/shield.png", Color(100, 149, 237), 120,
@@ -541,8 +554,21 @@ function MODULE:RegisterHooks()
                 if curTime < dashCooldown then return end
                 
                 local force = ply:OnGround() and 3000 or 1500
-                ply:SetGroundEntity(NULL)
-                ply:SetVelocity(ply:GetForward() * force)
+                local forward = ply:GetForward()
+                local velocity = ply:GetVelocity()
+
+                -- Dash horizontally only; keep the current vertical velocity
+                -- so an air dash does not kill upward momentum.
+                forward = Vector(forward.x, forward.y, 0)
+                if forward:LengthSqr() < 0.001 then
+                    forward = Vector(1, 0, 0)
+                else
+                    forward:Normalize()
+                end
+
+                -- Only detach from the ground for a ground dash.
+                if ply:OnGround() then ply:SetGroundEntity(NULL) end
+                ply:SetVelocity(Vector(forward.x * force, forward.y * force, velocity.z))
                 ply.BW_DashCooldown = curTime + 3
                 
                 if SERVER then
@@ -570,6 +596,7 @@ function MODULE:RegisterHooks()
                 return 0
             end
         end)
+
     end
 
     hook.Add("OnPlayerHitGround", "BW_Boosters_ResetJump", function(ply)
