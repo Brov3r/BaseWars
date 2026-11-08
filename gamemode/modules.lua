@@ -27,18 +27,22 @@ end
 
 function MODULE_BASE:Initialize()
     if self.Init then 
-        local success, err = pcall(self.Init, self)
+        local success, err = xpcall(function() return self:Init() end, debug_traceback)
         if not success then
+            self.State = "failed"
             Log("error", cols.Red, "[Loader] ", cols.White, "Init error in module ", cols.Cyan, self.Name, cols.White, ":\n", err)
+            return false
         end
     end
+    self.State = "ready"
+    return true
 end
 
 -- Loader
 local Loader = {}
 
 local function SafeInclude(filePath)
-    return xpcall(include, debug_traceback, filePath)
+    return xpcall(function() return include(filePath) end, debug_traceback)
 end
 
 local function GetModuleInfo(fileName)
@@ -82,6 +86,8 @@ end
 
 function Loader:ScanAndLoad()
     local files = file.Find(MODULES_PATH .. "*.lua", "LUA")
+    BW.Modules = {}
+    table.sort(files)
     
     for _, fileName in ipairs(files) do
         local id, realm = GetModuleInfo(fileName)
@@ -92,6 +98,7 @@ function Loader:ScanAndLoad()
         
         if ProcessModuleFile(filePath, realm) then
             BW.Modules[id] = _G.MODULE
+            BW.Modules[id].State = "loaded"
         end
         
         _G.MODULE = oldModule
@@ -104,9 +111,10 @@ function Loader:ScanAndLoad()
     local function visitNode(modID)
         if visiting[modID] then
             Log("error", cols.Red, "[Loader] Circular dependency detected involving: ", modID)
-            return
+            BW.Modules[modID].State = "failed"
+            return false
         end
-        if visited[modID] then return end
+        if visited[modID] then return BW.Modules[modID].State ~= "failed" end
         
         visiting[modID] = true
         local mod = BW.Modules[modID]
@@ -114,9 +122,10 @@ function Loader:ScanAndLoad()
         if mod and mod.Require then
             for _, reqID in ipairs(mod.Require) do
                 if BW.Modules[reqID] then
-                    visitNode(reqID)
+                    if not visitNode(reqID) then mod.State = "failed" end
                 else
                     Log("error", cols.Red, "[Loader] Missing dependency '", reqID, "' for module '", modID, "'")
+                    mod.State = "failed"
                 end
             end
         end
@@ -124,6 +133,7 @@ function Loader:ScanAndLoad()
         visiting[modID] = nil
         visited[modID] = true
         table_insert(sorted, modID)
+        return mod.State ~= "failed"
     end
     
     for id, _ in pairs(BW.Modules) do
@@ -135,9 +145,15 @@ function Loader:ScanAndLoad()
         local mod = BW.Modules[modID]
         
         if (SERVER and mod.Realm ~= BW.REALM_CLIENT) or (CLIENT and mod.Realm ~= BW.REALM_SERVER) then
-            mod:Initialize()
-            initCount = initCount + 1
-            Log("info", cols.White, "Module ", cols.Cyan, mod.Name, cols.White, " initialized.")
+            for _, dependency in ipairs(mod.Require) do
+                if not BW.Modules[dependency] or BW.Modules[dependency].State ~= "ready" then mod.State = "failed" end
+            end
+            if mod.State ~= "failed" and mod:Initialize() then
+                initCount = initCount + 1
+                Log("info", cols.White, "Module ", cols.Cyan, mod.Name, cols.White, " initialized.")
+            else
+                Log("error", "Module", modID, "disabled due to initialization/dependency failure")
+            end
         end
     end
     

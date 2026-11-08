@@ -8,6 +8,8 @@ local config = BW.Config
 local cols = config.Colors or {}
 
 local activeBoosters = {}
+local boostedPlayers = {}
+local damageHealth = setmetatable({}, {__mode = "k"})
 
 function MODULE:Init()
     self:RegisterBaseEntity()
@@ -276,11 +278,15 @@ function MODULE:InitServer()
 end
 
 function MODULE:ConsumeBooster(ply, class)
+    if not SERVER or not IsValid(ply) or not ply:Alive() then return end
     ply.BW_ActiveBoosters = ply.BW_ActiveBoosters or {}
     
     local entData = scripted_ents.GetStored(class)
     if not entData or not entData.t then return end
     local entTable = entData.t
+    boostedPlayers[ply] = true
+    local protection = BW.Modules.protection
+    if protection and protection.State == "ready" then protection:StripProtection(ply) end
 
     local existingBooster = nil
     for _, b in ipairs(ply.BW_ActiveBoosters) do
@@ -346,6 +352,7 @@ function MODULE:RemoveBoosterInstance(ply, index)
     end
 
     table.remove(ply.BW_ActiveBoosters, index)
+    if #ply.BW_ActiveBoosters == 0 then boostedPlayers[ply] = nil end
     self:SyncBoosters(ply)
 end
 
@@ -361,10 +368,15 @@ function MODULE:ClearBoosters(ply, silent)
     end
     
     ply.BW_ActiveBoosters = {}
+    boostedPlayers[ply] = nil
+    ply.BW_DoubleJumped = false
+    ply.BW_NextRegen = nil
+    ply.BW_NextArmorRegen = nil
     self:SyncBoosters(ply)
 end
 
 function MODULE:SyncBoosters(ply)
+    if not SERVER or not IsValid(ply) then return end
     net.Start("BW_UpdateBoosters")
     net.WriteUInt(#ply.BW_ActiveBoosters, 4)
     for _, b in ipairs(ply.BW_ActiveBoosters) do
@@ -503,6 +515,7 @@ end
 
 function MODULE:RegisterHooks()
     hook.Add("KeyPress", "BW_Boosters_DoubleJump", function(ply, key)
+        if not ply:Alive() or (CLIENT and ply ~= LocalPlayer()) then return end
         if key == IN_JUMP and not ply:OnGround() and ply:WaterLevel() < 1 then
             local hasBooster = false
             if SERVER then
@@ -519,7 +532,8 @@ function MODULE:RegisterHooks()
             end
         end
 
-        if key == IN_SPEED and ply.BW_HasDash then
+        local hasDash = SERVER and ply.BW_HasDash or (CLIENT and MODULE:HasClientBooster("bw_booster_dash"))
+        if key == IN_SPEED and hasDash then
             local curTime = CurTime()
             
             if ply.BW_LastSpeedPress and (curTime - ply.BW_LastSpeedPress) < 0.3 then
@@ -543,7 +557,7 @@ function MODULE:RegisterHooks()
                     util.Effect("ManhackSparks", effect, true, true)
                 end
                                     
-                ply:EmitSound("ambient/wind/wind_snippet2.wav", 75, 150)
+                if SERVER then ply:EmitSound("ambient/wind/wind_snippet2.wav", 75, 150) end
             end
             
             ply.BW_LastSpeedPress = curTime
@@ -564,41 +578,54 @@ function MODULE:RegisterHooks()
 
     if SERVER then
         hook.Add("PlayerDeathThink", "BW_Resurrection_BlockSpawn", function(ply)
-            if ply.BW_HasResurrection then
+            if ply.BW_ResurrectionPending then
                 return false 
             end
         end)
         hook.Add("PlayerDeath", "BW_Boosters_Death", function(ply)
-            if ply.BW_HasResurrection then
-                
-                local deathPos = ply:GetPos()
-                local deathAng = ply:EyeAngles()
-                
-                ply.BW_HasResurrection = false
-                
-                timer.Simple(1, function()
-                    if IsValid(ply) then
-                        ply:Spawn()
-                        
-                        ply:SetPos(deathPos + Vector(0,0,5))
-                        ply:SetEyeAngles(deathAng)
-                        
-                        ply:SetHealth(50)
-                        ply:Notify(NOTIFY_INFO, Translate("Booster.ResurrectionUse", "Your second chance is used!"), 5)
-                        self:ClearBoosters(ply, true)
-                    end
-                end)
-                
-                return true
-            end
-            
+            local resurrect = ply.BW_HasResurrection
+            local deathPos, deathAng = ply:GetPos() + Vector(0, 0, 5), ply:EyeAngles()
             self:ClearBoosters(ply, true)
             ply.BW_DoubleJumped = false
+            if not resurrect then return end
+            local token = {}
+            ply.BW_ResurrectionPending = token
+            timer.Simple(1, function()
+                if not IsValid(ply) or ply:Alive() or ply.BW_ResurrectionPending ~= token then return end
+                ply.BW_ResurrectionPending = nil
+                ply.BW_Resurrecting = true
+                ply:Spawn()
+                ply.BW_Resurrecting = nil
+                local generation = ply.BW_BoosterSpawnGeneration
+                -- Run after custom spawn-point placement, without modifying that entity.
+                timer.Simple(0, function()
+                    if not IsValid(ply) or not ply:Alive() or ply.BW_BoosterSpawnGeneration ~= generation then return end
+                    local mins, maxs = ply:GetHull()
+                    local trace = util.TraceHull({start = deathPos, endpos = deathPos, mins = mins, maxs = maxs, filter = ply, mask = MASK_PLAYERSOLID})
+                    if util.IsInWorld(deathPos) and not trace.Hit and not trace.StartSolid then ply:SetPos(deathPos) end
+                    ply:SetEyeAngles(deathAng)
+                    ply:SetHealth(50)
+                    ply:Notify(NOTIFY_INFO, Translate("Booster.ResurrectionUse", "Your second chance is used!"), 5)
+                end)
+            end)
+        end)
+        hook.Add("PlayerSpawn", "BW_Boosters_ResetSpawn", function(ply)
+            ply.BW_ResurrectionPending = nil
+            ply.BW_BoosterSpawnGeneration = (ply.BW_BoosterSpawnGeneration or 0) + 1
+            ply.BW_DoubleJumped = false
+            ply.BW_LastSpeedPress = nil
+            ply.BW_DashCooldown = nil
+        end)
+        hook.Add("PlayerDisconnected", "BW_Boosters_Cleanup", function(ply)
+            boostedPlayers[ply] = nil
+            ply.BW_ResurrectionPending = nil
         end)
 
-        hook.Add("Think", "BW_Boosters_Think", function()
+        hook.Remove("Think", "BW_Boosters_Think")
+        timer.Create("BW_Boosters_Update", 0.2, 0, function()
             local ct = CurTime()
-            for _, ply in ipairs(player.GetAll()) do
+            for ply in pairs(boostedPlayers) do
+                if not IsValid(ply) then boostedPlayers[ply] = nil continue end
                 if ply.BW_ActiveBoosters and #ply.BW_ActiveBoosters > 0 then
                     for i = #ply.BW_ActiveBoosters, 1, -1 do
                         local b = ply.BW_ActiveBoosters[i]
@@ -635,6 +662,7 @@ function MODULE:RegisterHooks()
         end)
 
         hook.Add("EntityTakeDamage", "BW_Boosters_DamageModifiers", function(target, dmginfo)
+            if target:IsPlayer() or target:IsNPC() then damageHealth[dmginfo] = target:Health() end
             if target:IsPlayer() and target.BW_HasPainkiller then
                 dmginfo:ScaleDamage(0.7)
             end
@@ -644,9 +672,15 @@ function MODULE:RegisterHooks()
                 dmginfo:ScaleDamage(1.3)
             end
             
+        end)
+        hook.Add("PostEntityTakeDamage", "BW_Boosters_Vampirism", function(target, dmginfo, tookDamage)
+            local before = damageHealth[dmginfo]
+            damageHealth[dmginfo] = nil
+            if not tookDamage or not before then return end
+            local attacker = dmginfo:GetAttacker()
             if IsValid(attacker) and attacker:IsPlayer() and attacker.BW_IsVampire and target ~= attacker then
                 if target:IsPlayer() or target:IsNPC() then
-                    local damageDone = dmginfo:GetDamage()
+                    local damageDone = math.max(0, math.min(before, before - math.max(0, target:Health())))
                     local healAmount = math.Round(damageDone * 0.2)
                     
                     if healAmount > 0 and attacker:Alive() then
@@ -656,7 +690,6 @@ function MODULE:RegisterHooks()
                 end
             end
 
-            return false 
         end)
     end
 end

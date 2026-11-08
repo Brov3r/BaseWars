@@ -1,256 +1,292 @@
 local MODULE = MODULE
-
 MODULE.Name = "Notify"
 MODULE.Author = "Brov3r"
 MODULE.Require = {}
 
 local PLAYER = FindMetaTable("Player")
+local config = BW.Config.Notify or {}
 
-local config    = BW.Config
-local colors    = config.Colors
-local mod       = MODULE
+-- Title is slightly larger than the body text; a tighter line height keeps multiline notices compact.
+local TITLE_FONT = "Inter20"
+local TEXT_FONT = "Inter18Thin"
+local TEXT_LINE_HEIGHT = 20
+local TITLE_TOP, TEXT_TOP = 8, 30
 
-local NOTIFY_TYPES = {
-    [0] = {logLevel = "info",    name = Translate("Notify.Info", "Info"),    color = colors.Info, icon = "icon16/information.png"},
-    [1] = {logLevel = "error",   name = Translate("Notify.Error", "Error"),  color = colors.Error, icon = "icon16/exclamation.png"},
-    [2] = {logLevel = "success", name = Translate("Notify.Success", "Success"), color = colors.Success, icon = "icon16/tick.png"},
-    [3] = {logLevel = "warn",    name = Translate("Notify.Warn", "Warning"), color = colors.Warn,  icon = "icon16/error.png"},
-    [4] = {logLevel = "info",    name = Translate("Notify.Hint", "Hint"),    color = colors.Hint or colors.Info, icon = "icon16/lightbulb.png"},
+NOTIFY_INFO, NOTIFY_ERROR, NOTIFY_SUCCESS, NOTIFY_WARNING = 0, 1, 2, 3
+-- Keep Sandbox's global hint constant intact. Custom hints use BW.NOTIFY_HINT.
+NOTIFY_HINT = 3
+BW.NOTIFY_HINT = 4
+
+local TYPES = {
+    [0] = {key = "Info", fallback = "Info", color = Color(112, 182, 240), icon = "icon16/information.png", log = "info"},
+    [1] = {key = "Error", fallback = "Error", color = Color(240, 115, 120), icon = "icon16/exclamation.png", log = "error"},
+    [2] = {key = "Success", fallback = "Success", color = Color(62, 214, 153), icon = "icon16/tick.png", log = "success"},
+    [3] = {key = "Warn", fallback = "Warning", color = Color(235, 192, 102), icon = "icon16/error.png", log = "warn"},
+    [4] = {key = "Hint", fallback = "Hint", color = Color(170, 155, 235), icon = "icon16/lightbulb.png", log = "info"}
 }
 
-NOTIFY_INFO    = 0
-NOTIFY_ERROR   = 1
-NOTIFY_SUCCESS = 2
-NOTIFY_WARNING = 3
-NOTIFY_HINT    = 4
+local function Number(value, default, minimum, maximum)
+    value = tonumber(value)
+    if not BW.Utils.IsFinite(value) then value = default end
+    return math.Clamp(value, minimum, maximum)
+end
+
+function MODULE:NormalizeNotification(kind, text, duration)
+    kind = tonumber(kind)
+    if not BW.Utils.IsFinite(kind) or not TYPES[kind] then kind = NOTIFY_INFO end
+    text = tostring(text or "")
+    if not utf8.len(text) then
+        if not utf8.force then return end
+        text = utf8.force(text)
+    end
+    text = string.Trim(text:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("%z", ""):gsub("\t", "    "))
+    text = text:gsub("<#%x%x%x%x%x%x>", ""):gsub("</?color[^>]*>", "")
+    if text == "" then return end
+    local maxLength = math.floor(Number(config.MaxTextLength, 512, 1, 2048))
+    if utf8.len(text) > maxLength then text = BW.Utils.UTF8Sub(text, 1, maxLength) .. "..." end
+    local defaultDuration = Number(config.DefaultDuration, 5, 0.75, 30)
+    local maxDuration = Number(config.MaxDuration, 30, 0.75, 60)
+    duration = tonumber(duration)
+    if not BW.Utils.IsFinite(duration) or duration <= 0 then duration = defaultDuration end
+    return kind, text, math.Clamp(duration, 0.75, maxDuration)
+end
 
 function MODULE:Init()
     if SERVER then
         util.AddNetworkString("BW_CustomNotify")
-
-        function PLAYER:Notify(notifType, text, duration)
+        function PLAYER:Notify(kind, text, duration)
             if not IsValid(self) then return end
-            notifType = tonumber(notifType) or NOTIFY_INFO
-            text = tostring(text or "")
-            duration = tonumber(duration) or 5
-
+            kind, text, duration = MODULE:NormalizeNotification(kind, text, duration)
+            if kind == nil then return end
             net.Start("BW_CustomNotify")
-                net.WriteUInt(notifType, 8)
-                net.WriteString(text)
-                net.WriteFloat(duration)
+            net.WriteUInt(kind, 8)
+            net.WriteString(text)
+            net.WriteFloat(duration)
             net.Send(self)
         end
     else
-        self.notifications = {}
         self:InitClient()
     end
 end
 
 function MODULE:InitClient()
-    self.MAX_NOTIFICATIONS = (config.Notify and config.Notify.MaxNotification) or 5
-    self.NOTIF_SPACING     = (config.Notify and config.Notify.Spacing) or 10
-    self.SLIDE_SPEED       = (config.Notify and config.Notify.SlideSpeed) or 5
+    self.notifications = self.notifications or {}
+    self.queue = self.queue or {}
+    self.MAX_NOTIFICATIONS = math.floor(Number(config.MaxNotification, 5, 1, 8))
+    self.MAX_QUEUED = math.floor(Number(config.MaxQueued, 64, 1, 256))
+    self.NOTIF_SPACING = Number(config.Spacing, 8, 0, 24)
+    self.SLIDE_SPEED = Number(config.SlideSpeed, 12, 1, 30)
+    self.Margin = Number(config.Margin, 16, 0, 64)
+    self.Opacity = Number(config.Opacity, 0.88, 0.4, 1)
 
-    function PLAYER:Notify(notifType, text, duration)
-        MODULE:AddNotification(notifType, text, duration)
+    function PLAYER:Notify(kind, text, duration)
+        MODULE:AddNotification(kind, text, duration)
     end
 
+    -- Sandbox calls GM:AddNotify(text, legacyType, duration), not with a player.
     local gm = gmod.GetGamemode()
     if gm then
-        gm.AddNotify = function(self, ply, msgType, text)
-            if IsValid(ply) and ply == LocalPlayer() then
-                MODULE:AddNotification(MODULE:MapLegacyType(msgType), text, 5)
-            end
+        gm.AddNotify = function(_, text, legacyType, duration)
+            notification.AddLegacy(text, legacyType, duration)
         end
     end
-
-    function notification.AddLegacy(text, legacyType, duration)
-        MODULE:AddNotification(MODULE:MapLegacyType(legacyType), text, duration or 5)
+    notification.AddLegacy = function(text, legacyType, duration)
+        if isstring(text) and text:sub(1, 1) == "#" then text = language.GetPhrase(text:sub(2)) end
+        MODULE:AddNotification(MODULE:MapLegacyType(legacyType), text, duration)
     end
-
-    self:RegisterHooks()
-end
-
-function MODULE:RegisterHooks()
-    hook.Add("HUDShouldDraw", "BW_HideLegacyNotify", function(name)
-        if name == "Notify" then return false end
-    end)
 
     net.Receive("BW_CustomNotify", function()
-        MODULE:AddNotification(net.ReadUInt(8), net.ReadString(), net.ReadFloat())
+        self:AddNotification(net.ReadUInt(8), net.ReadString(), net.ReadFloat())
     end)
-
-    hook.Add("HUDPaint", "BW_CustomNotify", function()
-        return MODULE:DrawNotify()
+    hook.Add("HUDPaint", "BW_CustomNotify", function() self:DrawNotify() end)
+    hook.Add("OnScreenSizeChanged", "BW_Notify_Resize", function()
+        self:FitToScreen(true)
+        self:PumpQueue(RealTime())
     end)
+    hook.Remove("HUDShouldDraw", "BW_HideLegacyNotify")
 end
 
-function MODULE:DrawNotify()
-    if not IsValid(LocalPlayer()) then return end
-
-    local scrW, scrH = ScrW(), ScrH()
-    local now = CurTime()
-    local ft = FrameTime()
-    local baseY = scrH - 20
-    local currentY = baseY
-
-    for i = #self.notifications, 1, -1 do
-        local notif = self.notifications[i]
-        local elapsed = now - notif.startTime
-        local timeLeft = notif.duration - elapsed
-
-        if timeLeft <= 0 then
-            table.remove(self.notifications, i)
-            continue
-        end
-
-        local NOTIF_WIDTH = notif.width
-        local NOTIF_HEIGHT = notif.height 
-        notif.targetX = scrW - NOTIF_WIDTH - 20
-
-        if elapsed < 0.4 then
-            notif.alpha = math.Approach(notif.alpha or 0, 255, ft * 700)
-            notif.x = Lerp(ft * self.SLIDE_SPEED * 1.2, notif.x, notif.targetX)
-            notif.scale = Lerp(ft * 8, notif.scale or 0.95, 1)
-        elseif timeLeft < 0.6 then
-            notif.alpha = math.Approach(notif.alpha or 255, 0, ft * 400)
-            notif.scale = Lerp(ft * 6, notif.scale or 1, 0.95)
-        else
-            notif.alpha = 255
-            notif.scale = 1
-        end
-
-        local alpha = math.Clamp(notif.alpha or 0, 0, 255)
-        currentY = currentY - NOTIF_HEIGHT - self.NOTIF_SPACING
-
-        if alpha <= 0 then continue end
-
-        local x = math.floor(notif.x)
-        local y = currentY + self.NOTIF_SPACING
-        local col = notif.color
-
-        draw.RoundedBox(8, x, y, NOTIF_WIDTH, NOTIF_HEIGHT, Color(22, 22, 26, alpha * 0.95))
-        draw.RoundedBox(8, x, y, NOTIF_WIDTH, 1, Color(255, 255, 255, alpha * 0.05))
-
-        draw.RoundedBox(4, x, y, 4, NOTIF_HEIGHT, Color(col.r, col.g, col.b, alpha))
-
-        local mat = self:GetMaterial(notif.icon)
-        if mat and not mat:IsError() then
-            draw.RoundedBox(6, x + 12, y + 8, 36, 36, Color(col.r, col.g, col.b, alpha * 0.1))
-            surface.SetDrawColor(255, 255, 255, alpha)
-            surface.SetMaterial(mat)
-            surface.DrawTexturedRect(x + 18, y + 14, 24, 24)
-        end
-
-        draw.SimpleText(notif.typeName, "Inter18", x + 58, y + 8,
-            Color(col.r, col.g, col.b, alpha), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-
-        local textY = y + 29
-        for _, line in ipairs(notif.lines) do
-            draw.SimpleText(line, "Inter16Thin", x + 58, textY,
-                Color(220, 220, 220, alpha * 0.9), TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-            textY = textY + 18
-        end
-
-        local barX = x
-        local barWidth = NOTIF_WIDTH
-        local barHeight = 4
-        local barY = y + NOTIF_HEIGHT - barHeight
-        
-        local progressWidth = barWidth * math.Clamp(timeLeft / notif.duration, 0, 1)
-
-        draw.RoundedBox(barHeight / 2, barX, barY, barWidth, barHeight, Color(col.r * 0.5, col.g * 0.5, col.b * 0.5, alpha * 0.4))
-        
-        if progressWidth > 0 then
-            draw.RoundedBox(barHeight / 2, barX, barY, progressWidth, barHeight, Color(col.r, col.g, col.b, alpha))
-
-            draw.RoundedBox(barHeight / 2, barX, barY, progressWidth, 1, Color(255, 255, 255, alpha * 0.25))
-        end
-    end
+function MODULE:MapLegacyType(kind)
+    -- Native IDs are fixed, even if another addon changes global constants.
+    local legacy = {[0] = 0, [1] = 1, [2] = 3, [3] = 4, [4] = 2}
+    return legacy[tonumber(kind)] or NOTIFY_INFO
 end
 
-function MODULE:GetMaterial(iconPath)
+function MODULE:GetMaterial(path)
     self.iconMaterials = self.iconMaterials or {}
-    if not self.iconMaterials[iconPath] then
-        self.iconMaterials[iconPath] = Material(iconPath)
-    end
-    return self.iconMaterials[iconPath]
+    if not self.iconMaterials[path] then self.iconMaterials[path] = Material(path, "smooth") end
+    return self.iconMaterials[path]
 end
 
-function MODULE:MapLegacyType(legacyType)
-    if legacyType == NOTIFY_GENERIC then return NOTIFY_INFO
-    elseif legacyType == NOTIFY_ERROR   then return NOTIFY_ERROR
-    elseif legacyType == NOTIFY_UNDO    then return NOTIFY_WARNING
-    elseif legacyType == NOTIFY_HINT    then return NOTIFY_HINT
-    elseif legacyType == NOTIFY_CLEANUP then return NOTIFY_SUCCESS
+function MODULE:GetNotificationSound(kind)
+    if config.Sound == false then return end
+    local sound = config.Sound
+    if kind == NOTIFY_ERROR then
+        local errorSound = config.ErrorSound
+        if errorSound == nil then errorSound = "buttons/button10.wav" end
+        sound = errorSound
     end
-    return NOTIFY_INFO
+    if isstring(sound) and sound ~= "" then return sound end
 end
 
-function MODULE:WrapText(text, maxWidth)
+function MODULE:WrapText(text, maxWidth, maxLines)
     local lines = {}
-    local words = string.Explode(" ", text)
-    local currentLine = ""
-    for _, word in ipairs(words) do
-        local testLine = (currentLine == "" and word) or (currentLine .. " " .. word)
-        if surface.GetTextSize(testLine) > maxWidth and currentLine ~= "" then
-            lines[#lines + 1] = currentLine
-            currentLine = word
-        else
-            currentLine = testLine
+    maxWidth = math.max(1, maxWidth)
+    for paragraph in (text .. "\n"):gmatch("(.-)\n") do
+        local current = ""
+        for word in paragraph:gmatch("%S+") do
+            local combined = current == "" and word or current .. " " .. word
+            if current ~= "" and surface.GetTextSize(combined) > maxWidth then
+                lines[#lines + 1], current = current, ""
+            end
+            -- Split long URLs/IDs by complete UTF-8 characters, not bytes.
+            while surface.GetTextSize(word) > maxWidth do
+                local low, high = 1, utf8.len(word)
+                while low < high do
+                    local middle = math.ceil((low + high) / 2)
+                    if surface.GetTextSize(BW.Utils.UTF8Sub(word, 1, middle)) <= maxWidth then low = middle else high = middle - 1 end
+                end
+                lines[#lines + 1] = BW.Utils.UTF8Sub(word, 1, low)
+                word = BW.Utils.UTF8Sub(word, low + 1)
+            end
+            if word ~= "" then current = current == "" and word or current .. " " .. word end
         end
+        if current ~= "" or paragraph == "" then lines[#lines + 1] = current end
     end
-    if currentLine ~= "" then lines[#lines + 1] = currentLine end
+    if #lines == 0 then lines[1] = "" end
+    if maxLines and #lines > maxLines then
+        for i = #lines, maxLines + 1, -1 do lines[i] = nil end
+        lines[maxLines] = BW.Utils.TruncateText(lines[maxLines] .. " ...", TEXT_FONT, maxWidth)
+    end
     return lines
 end
 
 function MODULE:CalculateNotificationSize(notif)
-    if notif.calculatedSize then return end
-
-    surface.SetFont("Inter16Thin")
-    local maxWidth = 300
-    local lines = self:WrapText(notif.text, maxWidth)
-    notif.lines = lines
-    
-    local maxLineW = 0
-    for _, line in ipairs(lines) do
-        local w = surface.GetTextSize(line)
-        if w > maxLineW then maxLineW = w end
-    end
-
-    surface.SetFont("Inter18")
-    local typeW, _ = surface.GetTextSize(notif.typeName)
-
-    local minWidthFromContent = math.max(typeW, maxLineW) + 58 + 20
-    
-    notif.width = math.Clamp(minWidthFromContent, 200, 400)
-    
-    notif.textHeight = #lines * 18
-    notif.height = 40 + notif.textHeight
-    notif.calculatedSize = true
+    local maxWidth = math.max(1, math.min(Number(config.MaxWidth, 380, 160, 600), ScrW() - self.Margin * 2))
+    local textWidth = math.max(1, maxWidth - 70)
+    local maxLines = math.min(math.floor(Number(config.MaxLines, 6, 1, 12)), math.max(1, math.floor((ScrH() - self.Margin * 2 - 44) / TEXT_LINE_HEIGHT)))
+    surface.SetFont(TEXT_FONT)
+    notif.lines = self:WrapText(notif.text, textWidth, maxLines)
+    local widest = 0
+    for _, line in ipairs(notif.lines) do widest = math.max(widest, surface.GetTextSize(line)) end
+    local data = TYPES[notif.type]
+    notif.typeName = Translate("Notify." .. data.key, data.fallback)
+    notif.title = notif.typeName
+    surface.SetFont(TITLE_FONT)
+    widest = math.max(widest, surface.GetTextSize(notif.title))
+    notif.width = math.min(maxWidth, math.max(math.min(240, maxWidth), widest + 70))
+    notif.title = BW.Utils.TruncateText(notif.title, TITLE_FONT, math.max(1, notif.width - 70))
+    notif.height = 44 + #notif.lines * TEXT_LINE_HEIGHT
 end
 
-function MODULE:AddNotification(notifType, text, duration)
-    local typeData = NOTIFY_TYPES[notifType] or NOTIFY_TYPES[NOTIFY_INFO]
-    local notif = {
-        type      = notifType,
-        text      = text,
-        duration  = duration,
-        startTime = CurTime(),
-        alpha     = 0,
-        x         = ScrW(),
-        targetX   = 0,
-        color     = typeData.color or colors.Info,
-        icon      = typeData.icon,
-        typeName  = typeData.name,
-    }
-    self:CalculateNotificationSize(notif)
-
-    table.insert(self.notifications, 1, notif)
-    while #self.notifications > self.MAX_NOTIFICATIONS do
-        table.remove(self.notifications)
+function MODULE:FitToScreen(force)
+    self:RemoveExpired(RealTime())
+    local resized = self.ScreenWidth ~= ScrW() or self.ScreenHeight ~= ScrH()
+    if force or resized then
+        self.ScreenWidth, self.ScreenHeight = ScrW(), ScrH()
+        for _, notif in ipairs(self.notifications) do self:CalculateNotificationSize(notif) end
+        for _, notif in ipairs(self.queue) do self:CalculateNotificationSize(notif) end
     end
+    local totalHeight = 0
+    for _, notif in ipairs(self.notifications) do totalHeight = totalHeight + notif.height + self.NOTIF_SPACING end
+    totalHeight = totalHeight - self.NOTIF_SPACING
+    local paused = {}
+    local now = RealTime()
+    while #self.notifications > 1 and (#self.notifications > self.MAX_NOTIFICATIONS or totalHeight > ScrH() - self.Margin * 2) do
+        local old = table.remove(self.notifications)
+        totalHeight = totalHeight - old.height - self.NOTIF_SPACING
+        old.duration = math.max(0.01, old.startTime + old.duration - now)
+        old.startTime, old.y = nil, nil
+        old.x = ScrW() + 12
+        paused[#paused + 1] = old
+    end
+    for i = #paused, 1, -1 do table.insert(self.queue, 1, paused[i]) end
+end
 
-    surface.PlaySound("ambient/water/drip1.wav")
-    if Log then Log(typeData.logLevel, "[Notify]", text) end
+function MODULE:RemoveExpired(now)
+    for i = #self.notifications, 1, -1 do
+        local notif = self.notifications[i]
+        if now >= notif.startTime + notif.duration then table.remove(self.notifications, i) end
+    end
+end
+
+function MODULE:PumpQueue(now)
+    local totalHeight = 0
+    for _, notif in ipairs(self.notifications) do totalHeight = totalHeight + notif.height + self.NOTIF_SPACING end
+    local added, addedError, playSound = false, false, false
+    while #self.queue > 0 and #self.notifications < self.MAX_NOTIFICATIONS do
+        local nextNotice = self.queue[1]
+        if #self.notifications > 0 and totalHeight + nextNotice.height > ScrH() - self.Margin * 2 then break end
+        table.remove(self.queue, 1)
+        nextNotice.startTime = now
+        nextNotice.x, nextNotice.y = ScrW() + 12, nil
+        if not nextNotice.soundPlayed then
+            nextNotice.soundPlayed = true
+            playSound = true
+            if nextNotice.type == NOTIFY_ERROR then addedError = true end
+        end
+        table.insert(self.notifications, 1, nextNotice)
+        totalHeight = totalHeight + nextNotice.height + self.NOTIF_SPACING
+        added = true
+    end
+    if added and playSound then
+        local sound = self:GetNotificationSound(addedError and NOTIFY_ERROR or nil)
+        if sound then surface.PlaySound(sound) end
+    end
+end
+
+function MODULE:AddNotification(kind, text, duration)
+    kind, text, duration = self:NormalizeNotification(kind, text, duration)
+    if kind == nil then return end
+    local now = RealTime()
+    self:RemoveExpired(now)
+    self:FitToScreen()
+    self:PumpQueue(now)
+    if #self.queue >= self.MAX_QUEUED then return end
+    local notif = {type = kind, text = text, duration = duration, x = ScrW() + 12}
+    self:CalculateNotificationSize(notif)
+    table.insert(self.queue, notif)
+    self:PumpQueue(now)
+    if config.Log ~= false then Log(TYPES[kind].log, "[Notify]", text) end
+    return notif
+end
+
+function MODULE:DrawNotify()
+    if not self.notifications then return end
+    local now = RealTime()
+    self:RemoveExpired(now)
+    self:FitToScreen()
+    self:PumpQueue(now)
+    local frame = RealFrameTime and RealFrameTime() or FrameTime()
+    local blend = 1 - math.exp(-math.max(0, frame) * self.SLIDE_SPEED)
+    local bottom = ScrH() - self.Margin
+    for _, notif in ipairs(self.notifications) do
+        local elapsed = now - notif.startTime
+        local remaining = notif.duration - elapsed
+        local alpha = math.Clamp(math.min(elapsed / 0.16, remaining / 0.24, 1) * 255, 0, 255)
+        local targetX, targetY = ScrW() - self.Margin - notif.width, bottom - notif.height
+        notif.x = Lerp(blend, notif.x, targetX)
+        notif.y = Lerp(blend, notif.y or targetY, targetY)
+        local x, y = math.floor(notif.x), math.floor(notif.y)
+        local w, h = notif.width, notif.height
+        local color = TYPES[notif.type].color
+        draw.RoundedBox(9, x, y, w, h, Color(13, 18, 24, alpha * self.Opacity))
+        surface.SetDrawColor(43, 54, 65, alpha * self.Opacity)
+        surface.DrawLine(x + 9, y, x + w - 9, y)
+        draw.RoundedBox(7, x + 12, y + 12, 32, 32, Color(color.r, color.g, color.b, alpha * 0.12))
+        local material = self:GetMaterial(TYPES[notif.type].icon)
+        if not material:IsError() then
+            surface.SetMaterial(material)
+            surface.SetDrawColor(255, 255, 255, alpha)
+            surface.DrawTexturedRect(x + 19, y + 19, 18, 18)
+        end
+        draw.SimpleText(notif.title, TITLE_FONT, x + 56, y + TITLE_TOP, Color(color.r, color.g, color.b, alpha))
+        for i, line in ipairs(notif.lines) do
+            draw.SimpleText(line, TEXT_FONT, x + 56, y + TEXT_TOP + (i - 1) * TEXT_LINE_HEIGHT, Color(255, 255, 255, alpha))
+        end
+        local progress = math.Clamp(remaining / notif.duration, 0, 1)
+        draw.RoundedBox(1, x + 12, y + h - 7, w - 24, 2, Color(color.r, color.g, color.b, alpha * 0.12))
+        if progress > 0 then draw.RoundedBox(1, x + 12, y + h - 7, (w - 24) * progress, 2, Color(color.r, color.g, color.b, alpha * 0.7)) end
+        bottom = targetY - self.NOTIF_SPACING
+    end
 end

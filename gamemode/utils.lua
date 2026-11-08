@@ -16,6 +16,36 @@ local SysTime    = SysTime
 local Lerp       = Lerp
 local table_insert = table.insert
 
+function BW.Utils.IsFinite(value)
+    return isnumber(value) and value == value and value > -math.huge and value < math.huge
+end
+
+function BW.Utils.UTF8Sub(text, first, last)
+    text = tostring(text or "")
+    if not utf8.len(text) then return "" end
+    return utf8.sub(text, first, last)
+end
+
+-- A per-player token bucket. Reject before reading/processing client payloads.
+function BW.Utils.AllowRequest(ply, key, interval, burst, bits, maxBytes)
+    if not SERVER or not IsValid(ply) then return false end
+    if bits and (bits < 0 or bits > (maxBytes or 1024) * 8) then return false end
+    ply.BW_RequestLimits = ply.BW_RequestLimits or {}
+    local now = CurTime()
+    local state = ply.BW_RequestLimits[key] or {tokens = burst or 1, time = now}
+    state.tokens = math.min(burst or 1, state.tokens + (now - state.time) / interval)
+    state.time = now
+    ply.BW_RequestLimits[key] = state
+    if state.tokens < 1 then return false end
+    state.tokens = state.tokens - 1
+    return true
+end
+
+function BW.Utils.EscapeMarkup(text)
+    -- GMod markup has no general-purpose entity escaping. Remove tag delimiters.
+    return tostring(text or ""):gsub("<", "‹"):gsub(">", "›")
+end
+
 function BW.Utils.Log(...)
     local args = {...}
     if #args == 0 then return end
@@ -161,12 +191,16 @@ function BW.Utils.TruncateText(text, font, maxWidth)
         return text 
     end
 
-    local result = text
-    while #result > 1 and surface.GetTextSize(result .. "...") > maxWidth do
-        result = string_sub(result, 1, -2)
+    local low, high = 0, utf8.len(text) or 0
+    while low < high do
+        local mid = math.ceil((low + high) / 2)
+        if surface.GetTextSize(BW.Utils.UTF8Sub(text, 1, mid) .. "...") <= maxWidth then
+            low = mid
+        else
+            high = mid - 1
+        end
     end
-    
-    result = result .. "..."
+    local result = BW.Utils.UTF8Sub(text, 1, low) .. "..."
     textCache[cacheKey] = result
     
     if table.Count(textCache) > 1000 then textCache = {} end
@@ -214,6 +248,36 @@ function BW.Utils.DrawShadowedText(text, font, x, y, color, shadowColor, offsetX
 
     draw.SimpleText(text, font, x + offsetX, y + offsetY, shadowColor, alignX, alignY)
     draw.SimpleText(text, font, x, y, color, alignX, alignY)
+end
+
+local outlineCircle = {}
+for i = 0, 31 do
+    local angle = i * math.pi / 16
+    outlineCircle[i + 1] = {x = math.cos(angle), y = math.sin(angle)}
+end
+
+-- Stroke only the perimeter; a filled border underneath would make a translucent
+-- panel effectively opaque. Unit-circle coordinates are shared between frames.
+function BW.Utils.DrawRoundedOutline(radius, x, y, w, h, color)
+    if w <= 1 or h <= 1 then return end
+    w, h = w - 1, h - 1
+    radius = math.Clamp(radius, 0, math.min(w, h) / 2)
+    surface.SetDrawColor(color)
+    if radius < 1 then surface.DrawOutlinedRect(x, y, w + 1, h + 1) return end
+    surface.DrawLine(x + radius, y, x + w - radius, y)
+    surface.DrawLine(x + w, y + radius, x + w, y + h - radius)
+    surface.DrawLine(x + radius, y + h, x + w - radius, y + h)
+    surface.DrawLine(x, y + radius, x, y + h - radius)
+    for corner = 0, 3 do
+        local cx = corner < 2 and x + w - radius or x + radius
+        local cy = (corner == 0 or corner == 3) and y + radius or y + h - radius
+        local start = ((corner + 3) % 4) * 8
+        for i = 0, 7 do
+            local a = outlineCircle[(start + i) % 32 + 1]
+            local b = outlineCircle[(start + i + 1) % 32 + 1]
+            surface.DrawLine(cx + a.x * radius, cy + a.y * radius, cx + b.x * radius, cy + b.y * radius)
+        end
+    end
 end
 
 function BW.Utils.DrawProgressBar(x, y, w, h, value, min, max, colorBar, colorBackground)

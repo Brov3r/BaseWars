@@ -1,7 +1,7 @@
 local MODULE = MODULE
 MODULE.Name = "Command"
 MODULE.Author = "Brov3r"
-MODULE.Require = {"database", "notify"}
+MODULE.Require = {"database", "notify", "ownership"}
 
 MODULE.Commands = MODULE.Commands or {}
 MODULE.Cooldowns = MODULE.Cooldowns or {}
@@ -53,6 +53,8 @@ function MODULE:AddCommand(cmdName, callback, description, adminOnly, cooldown)
 end
 
 function MODULE:Init()
+    self.LoadoutCheck = {}
+    for _, class in ipairs(BW.Config.PlayerLoadout) do self.LoadoutCheck[class] = true end
     hook.Add("PlayerSay", "BW_ChatCommands", function(ply, text)
         local args = string.Explode(" ", text)
         local cmdName = string.lower(string.sub(args[1], 2))
@@ -95,8 +97,8 @@ function MODULE:RegisterDefaultCommands()
         end
 
         -- First ownership check
-        local owner = ent.Owner or ent:GetNWEntity("Owner")
-        local isOwner = (ent.CPPIGetOwner and ent:CPPIGetOwner() == ply) or (owner == ply)
+        local owner = BW.Ownership.GetOwner(ent)
+        local isOwner = owner == ply
         
         if not isOwner then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NotYour", "This object does not belong to you!"), 5)
@@ -115,8 +117,8 @@ function MODULE:RegisterDefaultCommands()
 
         -- Verify entity still exists and player still owns it before processing
         if not IsValid(ent) then return end
-        owner = ent.Owner or ent:GetNWEntity("Owner")
-        isOwner = (ent.CPPIGetOwner and ent:CPPIGetOwner() == ply) or (owner == ply)
+        owner = BW.Ownership.GetOwner(ent)
+        isOwner = owner == ply
         
         if not isOwner then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Sell.NotYour", "This object does not belong to you!"), 5)
@@ -135,7 +137,12 @@ function MODULE:RegisterDefaultCommands()
             or (BW and BW.Config and BW.Config.Economy and BW.Config.Economy.SellReturnRatioDefault) 
             or 0.3
 
-        local refundAmount = math.floor((cost * healthRatio) * sellRatio)
+        local refundAmount = math.floor(cost * healthRatio * math.Clamp(sellRatio, 0, 1))
+        if ply:GetMoney() + refundAmount > BW.Config.Economy.MaxMoney then
+            ent.IsBeingSold = nil
+            ply:Notify(NOTIFY_ERROR, Translate("Command.BalanceLimit", "Your balance limit would be exceeded."), 5)
+            return
+        end
 
         if refundAmount > 0 and ply.AddMoney then
             ply:AddMoney(refundAmount)
@@ -167,19 +174,21 @@ function MODULE:RegisterDefaultCommands()
     end, "Forces all bots to say a message", true, 0)
     
     self:AddCommand("drop", function(ply, args)
+        if not IsValid(ply) or not ply:Alive() then return end
         local activeWep = ply:GetActiveWeapon()
         if not IsValid(activeWep) then return end
         
         local wepClass = activeWep:GetClass()
         if not wepClass or wepClass == "" then return end
         
-        if LoadoutCheck[wepClass] then
+        if self.LoadoutCheck[wepClass] then
             ply:Notify(NOTIFY_ERROR, Translate("Command.Drop.Error", "You can't throw away this weapon!"), 5)
             return
         end
 
         local ammoType = activeWep:GetPrimaryAmmoType()
-        local ammoCount = math.max(0, ply:GetAmmoCount(ammoType))
+        local reserve = ammoType >= 0 and math.max(0, ply:GetAmmoCount(ammoType)) or 0
+        local ammoCount = reserve + math.max(0, activeWep:Clip1())
 
         local ent = ents.Create("spawned_weapon")
         if not IsValid(ent) then return end
@@ -190,13 +199,14 @@ function MODULE:RegisterDefaultCommands()
         ent:SetPos(pos)
         ent:SetWeaponClass(wepClass)
         ent:Spawn()
+        if not IsValid(ent) then return end
+        ent:SetAmmoCount(ammoCount)
         
         -- Only strip weapon after entity is created and spawned
         ply:StripWeapon(wepClass)
         
-        if ammoType ~= -1 and ammoCount > 0 then
-            ent:SetAmmoCount(ammoCount)
-            ply:RemoveAmmo(ammoCount, ammoType)
+        if ammoType >= 0 and reserve > 0 then
+            ply:RemoveAmmo(reserve, ammoType)
         end
 
         local phys = ent:GetPhysicsObject()
@@ -206,9 +216,10 @@ function MODULE:RegisterDefaultCommands()
     end, "Throw the weapon on the floor", false, 3)
 
    self:AddCommand("dropmoney", function(ply, args)
+        if not IsValid(ply) or not ply:Alive() or (not ply:IsBot() and not ply.BW_StatsLoaded) then return end
         local amount = tonumber(args[1])
         
-        if not amount or amount <= 0 then
+        if not BW.Utils.IsFinite(amount) or amount <= 0 or amount > BW.Config.Economy.MaxMoney then
             ply:Notify(NOTIFY_ERROR, Translate("Command.DropMoney.Hint", "Usage: /dropmoney [amount]"), 5)
             return
         end
@@ -234,6 +245,7 @@ function MODULE:RegisterDefaultCommands()
         local pos = (tr.StartPos:DistToSqr(tr.HitPos) > 40000) and (ply:GetShootPos() + ply:GetAimVector() * 80) or (tr.HitPos + tr.HitNormal * 15)
         ent:SetPos(pos)
         ent:Spawn()
+        if not IsValid(ent) then return end
         ent:Activate()
         
         -- Only take money after entity is created and spawned

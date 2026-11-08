@@ -4,11 +4,20 @@ MODULE.Name = "Map Zone"
 MODULE.Author = "Brov3r"
 MODULE.Require = {}
 
-local MIN_Z = -450
-local MAX_Z = 1500
-local DAMAGE_MULT = 0.2
+local zone = BW.Config.MapZones[game.GetMap()] or BW.Config.MapZones.Default
+local MIN_Z = zone and zone.MinZ or -450
+local MAX_Z = zone and zone.MaxZ or 1500
+local DAMAGE_MULT = zone and zone.DamageMultiplier or 0.2
 
 function MODULE:Init()
+    if SERVER then timer.Remove("HeightDamageCheck") end
+    if CLIENT then
+        hook.Remove("PostDrawTranslucentRenderables", "WaterZoneSurface")
+        hook.Remove("HUDPaint", "WaterZoneOverlay")
+    end
+    if not zone or zone.Enabled == false then return end
+    assert(BW.Utils.IsFinite(MIN_Z) and BW.Utils.IsFinite(MAX_Z) and MIN_Z < MAX_Z, "Invalid map zone heights")
+    assert(BW.Utils.IsFinite(DAMAGE_MULT) and DAMAGE_MULT >= 0, "Invalid map zone damage")
     if SERVER then
         timer.Create("HeightDamageCheck", 0.5, 0, function()
             for _, ply in ipairs(player.GetAll()) do
@@ -62,38 +71,28 @@ function MODULE:Init()
         })
 
         hook.Add("PostDrawTranslucentRenderables", "WaterZoneSurface", function(bDepth, bSkybox)
-            if bSkybox then return end 
+            if bDepth or bSkybox or zone.DrawWater == false then return end
+            if math.abs(EyePos().z - MIN_Z) > (zone.DrawDistance or 5000) then return end
+            render.UpdateRefractTexture()
             
             local offset = RealTime() * 0.05 
             
             local tileSize = 100 
             
+            local halfSize = zone.HalfSize or 16384
             cam.Start3D2D(Vector(0, 0, MIN_Z), Angle(0, 0, 0), 1)
                 surface.SetDrawColor(255, 255, 255, 230)
                 surface.SetMaterial(matWater)
                 
                 surface.DrawTexturedRectUV(
-                    -30000, -30000, 
-                    60000, 60000, 
+                    -halfSize, -halfSize,
+                    halfSize * 2, halfSize * 2,
                     offset, offset, 
                     tileSize + offset, tileSize + offset
                 )
             cam.End3D2D()
         end)
 
-        hook.Add("SetupFog", "WaterZoneFog", function()
-            local ply = LocalPlayer()
-            if not IsValid(ply) then return end
-
-            if ply:EyePos().z < MIN_Z then
-                render.FogMode(MATERIAL_FOG_LINEAR)
-                render.FogStart(0)
-                render.FogEnd(500)
-                render.FogMaxDensity(0.9)
-                render.FogColor(24, 104, 108)
-                return true
-            end
-        end)
 
         hook.Add("HUDPaint", "WaterZoneOverlay", function()
             local ply = LocalPlayer()

@@ -2,7 +2,7 @@ local MODULE = MODULE
 
 MODULE.Name = "Scoreboard"
 MODULE.Author = "Brov3r"
-MODULE.Require = { "database" }
+MODULE.Require = {"database", "notify"}
 
 
 function MODULE:Init()
@@ -30,7 +30,7 @@ function MODULE:CreateScoreboard()
         id = "nick", 
         header = Translate("Scoreboard.Nick", "Player"), 
         icon = "icon16/user.png", 
-        width = 180,
+        width = 330,
         maxWidth = 150,
         align = TEXT_ALIGN_LEFT,
         hasAvatar = true,
@@ -43,7 +43,7 @@ function MODULE:CreateScoreboard()
         id = "team", 
         header = Translate("Scoreboard.Team", "Team"), 
         icon = "icon16/group.png", 
-        width = 320, 
+        width = 240,
         align = TEXT_ALIGN_CENTER, 
         maxWidth = 150,
         getter = function(ply) return team.GetName(ply:Team()) or "-" end
@@ -53,7 +53,7 @@ function MODULE:CreateScoreboard()
         id = "kills", 
         header = "", 
         icon = "icon16/gun.png", 
-        width = 50, 
+        width = 65,
         align = TEXT_ALIGN_CENTER,
         getter = function(ply) return BW.Utils.NumWithSep(ply:GetKills() or 0) end
     })
@@ -62,7 +62,7 @@ function MODULE:CreateScoreboard()
         id = "deaths", 
         header = "", 
         icon = "icon16/cross.png", 
-        width = 50, 
+        width = 65,
         align = TEXT_ALIGN_CENTER,
         getter = function(ply) return BW.Utils.NumWithSep(ply:GetDeaths() or 0) end
     })
@@ -71,7 +71,7 @@ function MODULE:CreateScoreboard()
         id = "reputation", 
         header = "", 
         icon = "icon16/heart.png", 
-        width = 50, 
+        width = 80,
         align = TEXT_ALIGN_CENTER,
         getter = function(ply) return BW.Utils.NumWithSep(ply:GetReputation() or 0) end
     })
@@ -80,7 +80,7 @@ function MODULE:CreateScoreboard()
         id = "ping", 
         header = "", 
         icon = "icon16/connect.png", 
-        width = 50, 
+        width = 100,
         align = TEXT_ALIGN_CENTER,
         getter = function(ply) return BW.Utils.NumWithSep(ply:Ping() or 0) end
     })
@@ -95,14 +95,20 @@ function MODULE:RegisterHooks()
     end)
 
     hook.Add("ScoreboardHide", "BW_ScoreboardHide", function()
-        if IsValid(MODULE.scoreboardPanel) then
-            MODULE.scoreboardPanel:AlphaTo(0, 0.2, 0, function()
-                if IsValid(MODULE.scoreboardPanel) then
-                    MODULE.scoreboardPanel:Remove()
+        local panel = MODULE.scoreboardPanel
+        if IsValid(panel) then
+            panel:SetMouseInputEnabled(false)
+            panel:SetKeyboardInputEnabled(false)
+            panel:AlphaTo(0, 0.12, 0, function()
+                if IsValid(panel) then panel:Remove() end
+                if MODULE.scoreboardPanel == panel then
                     MODULE.scoreboardPanel = nil
                 end
             end)
         end
+    end)
+    hook.Add("OnScreenSizeChanged", "BW_ScoreboardResize", function()
+        if IsValid(MODULE.scoreboardPanel) and MODULE.scoreboardPanel:IsMouseInputEnabled() then MODULE:CreateScoreboard() end
     end)
 
     hook.Add("PlayerDisconnected", "BW_ScoreboardCleanup", function()

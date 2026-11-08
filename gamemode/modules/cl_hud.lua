@@ -474,13 +474,9 @@ function MODULE:WeaponSelectionDraw(ply, bind, pressed)
             local dir = (bind == "invnext") and 1 or -1
             
             if dir > 0 then
-                self.Selector.Selected = (old % count) + 1
+                self.Selector:SetSelected((old % count) + 1)
             else
-                self.Selector.Selected = (old == 1) and count or (old - 1)
-            end
-            
-            if self.Selector.Selected ~= old then
-                surface.PlaySound("UI/buttonrollover.wav")
+                self.Selector:SetSelected((old == 1) and count or (old - 1))
             end
         end
         
@@ -495,9 +491,7 @@ function MODULE:WeaponSelectionDraw(ply, bind, pressed)
         if weapons and #weapons > 0 then
             local count = #weapons
             local target = (slotNum == 0) and 10 or slotNum
-            self.Selector.Selected = ((target - 1) % count) + 1
-            
-            surface.PlaySound("UI/buttonrollover.wav")
+            self.Selector:SetSelected(((target - 1) % count) + 1, true)
         end
         
         return true 

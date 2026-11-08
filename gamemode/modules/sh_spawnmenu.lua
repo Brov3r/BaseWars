@@ -2,12 +2,23 @@ local MODULE = MODULE
 
 MODULE.Name = "Spawnmenu"
 MODULE.Author = "Brov3r"
-MODULE.Require = { "database", "notify"}
+MODULE.Require = SERVER and {"database", "notify", "ownership"} or {"database", "notify"}
 
 local config = BW.Config
-local oldGetTools = CLIENT and spawnmenu.GetTools or nil
+if CLIENT then BW.OriginalGetTools = BW.OriginalGetTools or spawnmenu.GetTools end
+local shopIndex, propIndex = {}, {}
 
 function MODULE:Init()
+    for _, items in pairs(config.Shop or {}) do
+        for id, item in pairs(items) do shopIndex[id] = item end
+    end
+    for _, models in pairs(config.Props or {}) do
+        for _, data in ipairs(models) do
+            local model = string.lower(data[1])
+            if util.IsValidModel(model) then propIndex[model] = data.hp or 100
+            elseif SERVER then Log("warn", "Invalid prop model:", model) end
+        end
+    end
     if SERVER then
         self:InitServer()
     else
@@ -16,41 +27,26 @@ function MODULE:Init()
 end
 
 local function FindShopItem(itemID)
-    if not BW.Config or not BW.Config.Shop then return nil end
-    
-    for categoryID, items in pairs(BW.Config.Shop) do
-        if items[itemID] then
-            return items[itemID]
-        end
-    end
-    return nil
+    return shopIndex[itemID]
 end
 
 local function FindPropConfig(modelPath)
-    if not BW.Config or not BW.Config.Props then return false, 0 end
-    
-    local cleanedPath = string.lower(modelPath)
-    
-    for category, models in pairs(BW.Config.Props) do
-        for _, propData in ipairs(models) do
-            if propData[1] and string.lower(propData[1]) == cleanedPath then
-                return true, (propData.hp or 100)
-            end
-        end
-    end
-    
-    return false, 0
+    local hp = propIndex[string.lower(modelPath)]
+    return hp ~= nil, hp or 0
 end
 
 function BW.GetFinalPrice(ply, basePrice)
+    basePrice = tonumber(basePrice)
+    if not BW.Utils.IsFinite(basePrice) then return 0 end
+    basePrice = math.Clamp(basePrice, 0, BW.Config.Economy.MaxMoney)
     if not IsValid(ply) then return basePrice end
     
-    local rep = (ply.GetReputation and ply:GetReputation()) or 0
-    local discount = (BW.Config and BW.Config.Economy and BW.Config.Economy.ReputationDiscount) or 0.3
+    local rep = math.Clamp((ply.GetReputation and ply:GetReputation()) or 0, -100, 100)
+    local discount = math.Clamp(BW.Config.Economy.ReputationDiscount or 0.3, 0, 1)
     
     -- Формула: чем выше репутация, тем ниже цена.
     local multiplier = 1 - (rep / 100 * discount)
-    return math.Round(basePrice * multiplier)
+    return math.Clamp(math.Round(basePrice * multiplier), 0, BW.Config.Economy.MaxMoney)
 end
 
 function MODULE:InitServer()
@@ -58,9 +54,11 @@ function MODULE:InitServer()
     util.AddNetworkString("BW_SpawnProp")
 
     net.Receive("BW_SpawnProp", function(len, ply)
+        if not BW.Utils.AllowRequest(ply, "spawn_prop", 0.2, 3, len, 260) then return end
         if not IsValid(ply) or not ply:Alive() then return end
 
-        local model = net.ReadString()
+        local model = string.lower(net.ReadString())
+        if #model > 255 then return end
 
         local isAllowed, propHP = FindPropConfig(model)
         if not isAllowed then
@@ -102,7 +100,9 @@ function MODULE:InitServer()
         entAng.y = entAng.y + 180
         ent:SetAngles(entAng)
 
+        if not util.IsInWorld(ent:GetPos()) then ent:Remove() return end
         ent:Spawn()
+        if not IsValid(ent) then return end
         ent:Activate()
 
         if not isAirSpawn then
@@ -120,10 +120,7 @@ function MODULE:InitServer()
         ent:SetMaxHealth(propHP)
         ent:SetHealth(propHP)
 
-        if ent.SetPlayer then ent:SetPlayer(ply) end
-        if ent.SetCPPIOwner then ent:SetCPPIOwner(ply) end
-        ent.Owner = ply
-        ent:SetNWEntity("Owner", ply)
+        BW.Ownership.Assign(ply, ent)
 
         if ply.AddCount then
             ply:AddCount("props", ent)
@@ -136,7 +133,7 @@ function MODULE:InitServer()
         undo.Create("Prop")
             undo.AddEntity(ent)
             undo.SetPlayer(ply)
-        undo.Finish("Prop (" .. model:match("([^/]+)%.mdl$") .. ")")
+        undo.Finish("Prop (" .. (model:match("([^/]+)%.mdl$") or model) .. ")")
 
         Log("success", "Player ", BW.Config.Colors.Cyan, ply:Nick(), BW.Config.Colors.White, " spawn prop ", BW.Config.Colors.Cyan, model, BW.Config.Colors.White, " with HP: ", BW.Config.Colors.Green, tostring(propHP) .. " HP")
     
@@ -144,9 +141,12 @@ function MODULE:InitServer()
     end)
 
     net.Receive("BW_BuyShopItem", function(len, ply)
+        if not BW.Utils.AllowRequest(ply, "buy_item", 0.25, 2, len, 128) then return end
         if not IsValid(ply) or not ply:Alive() then return end
+        if not ply:IsBot() and not ply.BW_StatsLoaded then return end
 
         local itemID = net.ReadString()
+        if #itemID > 120 then return end
         local itemData = FindShopItem(itemID)
 
         if not itemData then 
@@ -155,9 +155,7 @@ function MODULE:InitServer()
         end
 
         if itemData.vip then
-            local userGroup = ply:GetUserGroup()
-            local groupConfig = BW.Config.PlayerGroups[userGroup]
-            local hasVIP = groupConfig and groupConfig.Privilege == true
+            local hasVIP = ply:HasPrivilege()
 
             if not hasVIP then
                 if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.VIPAlert", "This item requires VIP status!"), 5) end
@@ -194,15 +192,10 @@ function MODULE:InitServer()
             end
         end
 
-        local moneyTaken = false
-        if finalPrice > 0 and ply.TakeMoney then
-            ply:TakeMoney(finalPrice)
-            moneyTaken = true
-        end
+        if not ply:CheckLimit("sents") then return end
 
         local ent = ents.Create(itemData.ent)
         if not IsValid(ent) then
-            if moneyTaken and ply.AddMoney then ply:AddMoney(finalPrice) end
 
             Log("error", "Failed to create entity class: " .. tostring(itemData.ent) .. " for player " .. ply:Nick())
             if ply.Notify then
@@ -235,13 +228,18 @@ function MODULE:InitServer()
         if itemData.model then
             ent:SetModel(itemData.model)
         end
-        if ent.SetPlayer then ent:SetPlayer(ply) end
-        if ent.SetCPPIOwner then ent:SetCPPIOwner(ply) end
-        ent.Owner = ply
-        ent:SetNWEntity("Owner", ply)
+        BW.Ownership.Assign(ply, ent, itemID)
 
+        if not util.IsInWorld(ent:GetPos()) then ent:Remove() return end
         ent:Spawn()
+        if not IsValid(ent) then return end
         ent:Activate()
+        if finalPrice > 0 then
+            if not ply:HasMoney(finalPrice) then ent:Remove() return end
+            ply:TakeMoney(finalPrice)
+        end
+        ply:AddCount("sents", ent)
+        ply:AddCleanup("sents", ent)
 
         if not isAirSpawn then
             local mins = ent:OBBMins()
@@ -259,10 +257,12 @@ function MODULE:InitServer()
             local currentCount = ply:GetNWInt("BW_ItemCount_" .. itemID, 0)
             ply:SetNWInt("BW_ItemCount_" .. itemID, currentCount + 1)
 
+            local ownerID = ply:SteamID64()
             ent:CallOnRemove("BW_ShopLimit_Track", function()
-                if IsValid(ply) then
-                    local c = ply:GetNWInt("BW_ItemCount_" .. itemID, 0)
-                    ply:SetNWInt("BW_ItemCount_" .. itemID, math.max(0, c - 1))
+                local owner = player.GetBySteamID64(ownerID)
+                if IsValid(owner) then
+                    local c = owner:GetNWInt("BW_ItemCount_" .. itemID, 0)
+                    owner:SetNWInt("BW_ItemCount_" .. itemID, math.max(0, c - 1))
                 end
             end)
         end
@@ -283,7 +283,13 @@ function MODULE:InitServer()
         if not config.AllowedTools[string.lower(toolName)] then
             return false
         end
+        if IsValid(tr.Entity) and not tr.Entity:IsWorld() and not BW.Ownership.CanModify(ply, tr.Entity) then return false end
+        if toolName == "stacker_improved" and not ply:CheckLimit("props") then return false end
     end)
+    -- UI restrictions are not security boundaries. Block standard Sandbox spawning too.
+    for _, event in ipairs({"PlayerSpawnProp", "PlayerSpawnSENT", "PlayerSpawnNPC", "PlayerSpawnVehicle", "PlayerSpawnRagdoll", "PlayerSpawnEffect", "PlayerGiveSWEP", "PlayerSpawnSWEP"}) do
+        hook.Add(event, "BW_CustomSpawnOnly", function() return false end)
+    end
 end
 
 function MODULE:InitClient()
@@ -303,7 +309,7 @@ function MODULE:RegisterToolRestriction()
 
         if not isAllowed then
             local toolWeapon = weapons.Get("gmod_tool")
-            local firstTool = "physgun"
+            local firstTool
 
             if toolWeapon and toolWeapon.Tool then
                 local toolList = table.GetKeys(toolWeapon.Tool)
@@ -317,53 +323,53 @@ function MODULE:RegisterToolRestriction()
                 end
             end
             
-            RunConsoleCommand("gmod_toolmode", firstTool)
+            if firstTool and firstTool ~= new_value then RunConsoleCommand("gmod_toolmode", firstTool) end
         end
     end, "BW_ToolRestriction")
 end
 
-function MODULE:OverrideGetTools()
-    spawnmenu.GetTools = function()
-        local tools = oldGetTools()
-        if not tools then return nil end
-
-        for tabIndex, tab in pairs(tools) do
-            if tabIndex ~= 1 then continue end
-
-            if istable(tab) and tab.Items then
-                for catName, category in pairs(tab.Items) do
-                    for key, item in pairs(category) do
-                        if type(key) == "number" and istable(item) then
-                            local itemName = item.ItemName or "NO_NAME"
-                            local isAllowed = config and config.AllowedTools and config.AllowedTools[string.lower(itemName)]
-                            
-                            if not isAllowed then
-                                category[key] = nil
+function MODULE:FilterTools(source)
+    local tools = table.Copy(source or {})
+    for tabIndex, tab in pairs(tools) do
+        if istable(tab) and istable(tab.Items) then
+            local categories = {}
+            local categoryKeys = {}
+            for key, value in pairs(tab.Items) do
+                if isnumber(key) then categoryKeys[#categoryKeys + 1] = key
+                else categories[key] = value end
+            end
+            table.sort(categoryKeys)
+            for _, categoryKey in ipairs(categoryKeys) do
+                local category = tab.Items[categoryKey]
+                if istable(category) then
+                    local filtered, keys = {}, {}
+                    for key, value in pairs(category) do
+                        if isnumber(key) then keys[#keys + 1] = key
+                        else filtered[key] = value end
+                    end
+                    table.sort(keys)
+                    for _, key in ipairs(keys) do
+                        local item = category[key]
+                        if istable(item) then
+                            local commandMode = isstring(item.Command) and item.Command:match("^gmod_tool%s+([%w_]+)")
+                            local mode = commandMode or (isstring(item.ItemName) and string.lower(item.ItemName))
+                            local restricted = tabIndex == 1 or commandMode ~= nil
+                            if not restricted or (mode and config.AllowedTools[mode]) then
+                                filtered[#filtered + 1] = item
                             end
                         end
                     end
-
-                    local hasTools = false
-                    for key, item in pairs(category) do
-                        if type(key) == "number" and istable(item) then
-                            hasTools = true
-                            break
-                        end
-                    end
-                    
-                    if not hasTools then
-                        tab.Items[catName] = nil
-                    end
+                    if #filtered > 0 then categories[#categories + 1] = filtered end
                 end
             end
+            tab.Items = categories
         end
-        
-        if IsValid(g_SpawnMenu) and IsValid(g_SpawnMenu.ToolMenu) then
-            g_SpawnMenu.ToolMenu:InvalidateLayout(true)
-        end
-        
-        return tools
     end
+    return tools
+end
+
+function MODULE:OverrideGetTools()
+    spawnmenu.GetTools = function() return MODULE:FilterTools(BW.OriginalGetTools()) end
 end
 
 function MODULE:RegisterSpawnMenuHooks()

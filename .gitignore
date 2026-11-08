@@ -1,0 +1,54 @@
+# --- Локальные тесты ---
+tests/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# --- Редакторы ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+*~
+
+# --- Операционные системы ---
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# --- Временные и резервные файлы ---
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+*.log
+
+# --- Локальные базы данных и дампы ---
+# Боевая база лежит в garrysmod/sv.db и не должна попадать в репозиторий.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# --- Кэш инструментов и Lua ---
+node_modules/
+npm-debug.log*
+luacov.*.out
+.luacheckcache
+
+# content/ намеренно не игнорируется: здесь хранятся ресурсы режима.

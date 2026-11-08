@@ -43,14 +43,12 @@ local function mkFont(name, font, size, weight)
 end
 
 local function initFonts()
-    local files = file.Find("resource/fonts/*.ttf", "GAME")
-    
-    for _, f in ipairs(files) do
+    for _, fontName in ipairs(BW.Config.Fonts or {"Inter"}) do
+        local files = file.Find("resource/fonts/" .. fontName .. "*.ttf", "GAME")
         if SERVER then
-            resource.AddFile("resource/fonts/" .. f)
+            for _, f in ipairs(files) do resource.AddFile("resource/fonts/" .. f) end
         else
-            local fontBase = string.StripExtension(f)
-            
+            local fontBase = fontName
             for i = 10, 30, 2 do
                 mkFont(fontBase .. i, fontBase, i, 900)
                 mkFont(fontBase .. i .. "Thin", fontBase, i, 400)

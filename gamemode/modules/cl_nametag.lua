@@ -12,6 +12,7 @@ local lvlIcon = Material("icon16/award_star_gold_3.png")
 local iconRepUp   = Material("icon16/thumb_up.png")
 local iconRepDown = Material("icon16/thumb_down.png")
 local iconRepZero = Material("icon16/heart.png")
+local groupMaterials = {}
 
 function MODULE:Init()
     hook.Add("HUDDrawTargetID", "BW_HideDefaultTargetID", function()
@@ -47,9 +48,13 @@ function MODULE:DrawOverheadName(ply)
     if ply._overheadAlpha < 1 then return end
 
     local pos
-    local headBone = ply:LookupBone("ValveBiped.Bip01_Head1")
+    if ply.BW_NameTagModel ~= ply:GetModel() then
+        ply.BW_NameTagModel = ply:GetModel()
+        ply.BW_NameTagBone = ply:LookupBone("ValveBiped.Bip01_Head1")
+    end
+    local headBone = ply.BW_NameTagBone
     if headBone then
-        pos = ply:GetBonePosition(headBone) + Vector(0, 0, 18)
+        pos = (ply:GetBonePosition(headBone) or ply:EyePos()) + Vector(0, 0, 18)
     else
         pos = ply:GetPos() + Vector(0, 0, ply:OBBMaxs().z + 12)
     end
@@ -62,7 +67,9 @@ function MODULE:DrawOverheadName(ply)
 
     local userGroup = ply:GetUserGroup()
     local groupCfg  = BW.Config.PlayerGroups[userGroup]
-    local groupIcon = groupCfg and groupCfg.PrefixIcon and Material(groupCfg.PrefixIcon)
+    local iconPath = groupCfg and groupCfg.PrefixIcon
+    if iconPath and not groupMaterials[iconPath] then groupMaterials[iconPath] = Material(iconPath) end
+    local groupIcon = iconPath and groupMaterials[iconPath]
 
     cam.Start3D2D(pos, ang, nameTagCfg.Scale)
         local nick      = ply:Nick()

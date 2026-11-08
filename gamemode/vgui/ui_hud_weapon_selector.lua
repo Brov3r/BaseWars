@@ -1,141 +1,168 @@
 local PANEL = {}
 
 function PANEL:Init()
-    self:SetSize(500, 65)
-    self:SetPos(ScrW() / 2 - self:GetWide() / 2, 30)
-    
-    self.Weapons = {}
-    self.WeaponData = {} -- Кэш для имен и ширины текста
+    local cfg = BW.Config.WeaponSelector or {}
+    local opacity = tonumber(cfg.Opacity)
+    if not BW.Utils.IsFinite(opacity) then opacity = 0.88 end
+    local alpha = math.floor(math.Clamp(opacity, 0.4, 1) * 255)
+    local accent = (BW.Config.Scoreboard or {}).AccentColor or Color(62, 214, 153)
+    self.PanelWidth = cfg.Width or 520
+    self.TopOffset = cfg.TopOffset or 30
+    self.HideDelay = cfg.HideDelay or 2.5
+    self.ScrollSound = cfg.ScrollSound == nil and "UI/buttonrollover.wav" or cfg.ScrollSound
+    self.Padding, self.Gap, self.CardHeight = 8, 6, 30
+    self.Weapons, self.WeaponData = {}, {}
     self.Selected = 1
-    self.TargetAlpha = 0
-    self.CurrentAlpha = 0
-    self.ScrollOffset = 0
-    self.FullListWidth = 0
+    self.TargetAlpha, self.CurrentAlpha = 0, 0
+    self.ScrollOffset, self.FullListWidth = 0, 0
+    self.Colors = {
+        Background = Color(13, 18, 24, alpha), Border = Color(65, 81, 94),
+        Selected = Color(24, 43, 42), White = Color(255, 255, 255), Accent = accent,
+        SelectedBorder = Color(math.Round(accent.r * 0.9), math.Round(accent.g * 0.9), math.Round(accent.b * 0.9), math.Round(255 * 0.85))
+    }
+    self:SetMouseInputEnabled(false)
+    self:SetKeyboardInputEnabled(false)
+    self:SetAlpha(0)
+    self:UpdateLayout()
+end
+
+function PANEL:UpdateLayout()
+    local maxWidth = math.max(1, math.min(ScrW() - 24, self.PanelWidth))
+    local contentWidth = self.FullListWidth > 0 and math.max(140, self.FullListWidth + self.Padding * 2) or maxWidth
+    self:SetSize(math.min(maxWidth, contentWidth), self.CardHeight + self.Padding * 2)
+    self:SetPos((ScrW() - self:GetWide()) / 2, self.TopOffset)
+    self.ScreenWidth, self.ScreenHeight = ScrW(), ScrH()
+end
+
+function PANEL:ToUpperUTF8(text)
+    text = tostring(text or "")
+    if not utf8.len(text) then return "" end
+    local result = {}
+    for _, cp in utf8.codes(text) do
+        if cp >= 97 and cp <= 122 then cp = cp - 32
+        elseif cp >= 1072 and cp <= 1103 then cp = cp - 32
+        elseif cp == 1105 then cp = 1025 end
+        result[#result + 1] = utf8.char(cp)
+    end
+    return table.concat(result)
 end
 
 function PANEL:UpdateWeapons()
     local ply = LocalPlayer()
     if not IsValid(ply) then return end
-    
-    local allWeapons = ply:GetWeapons()
-    local sortedWeapons = {}
-
-    for _, wep in ipairs(allWeapons) do
-        if IsValid(wep) then
-            table.insert(sortedWeapons, wep)
-        end
+    local selectedWeapon = self.Weapons[self.Selected]
+    local weapons = {}
+    for _, wep in ipairs(ply:GetWeapons()) do
+        if IsValid(wep) then weapons[#weapons + 1] = wep end
     end
-
-    table.sort(sortedWeapons, function(a, b)
+    table.sort(weapons, function(a, b)
         local classA, classB = a:GetClass(), b:GetClass()
-        if classA == "weapon_physgun" then return true end
-        if classB == "weapon_physgun" then return false end
-
-        local slotA = (a.GetSlot and a:GetSlot()) or 0
-        local slotB = (b.GetSlot and b:GetSlot()) or 0
-        
-        if slotA == slotB then
-            return classA < classB
+        if classA ~= classB then
+            if classA == "weapon_physgun" then return true end
+            if classB == "weapon_physgun" then return false end
         end
-        return slotA < slotB
+        local slotA, slotB = a:GetSlot(), b:GetSlot()
+        if slotA ~= slotB then return slotA < slotB end
+        if classA ~= classB then return classA < classB end
+        return a:EntIndex() < b:EntIndex()
     end)
-
-    self.Weapons = sortedWeapons
+    self.Weapons = weapons
+    self.Selected = math.Clamp(self.Selected, 1, math.max(1, #weapons))
+    for index, weapon in ipairs(weapons) do
+        if weapon == selectedWeapon then self.Selected = index break end
+    end
     self:CacheWeaponNames()
 end
 
 function PANEL:CacheWeaponNames()
     self.WeaponData = {}
-    local totalWidth = 0
-    surface.SetFont("Inter16")
-    
-    for i, wep in ipairs(self.Weapons) do
-        local rawName = Translate("Weapons."..wep:GetClass(), Translate(wep:GetClass(), wep:GetPrintName()))
+    local x = 0
+    for index, wep in ipairs(self.Weapons) do
+        local class = wep:GetClass()
+        local rawName = Translate("Weapons." .. class, Translate(class, wep:GetPrintName()))
         local name = self:ToUpperUTF8(rawName)
-        local w = surface.GetTextSize(name)
-        
-        self.WeaponData[i] = { name = name, width = w, x = totalWidth }
-        totalWidth = totalWidth + w + (i < #self.Weapons and 25 or 0)
+        surface.SetFont("Inter16")
+        local textWidth = surface.GetTextSize(name)
+        local maxWidth = math.max(1, math.min(ScrW() - 24, self.PanelWidth) - self.Padding * 2)
+        local width = math.min(math.Clamp(textWidth + 24, 80, 180), maxWidth)
+        self.WeaponData[index] = {
+            name = BW.Utils.TruncateText(name, "Inter16", math.max(1, width - 24)),
+            width = width, x = x
+        }
+        x = x + width + self.Gap
     end
-    self.FullListWidth = totalWidth
+    self.FullListWidth = math.max(0, x - self.Gap)
+    self:UpdateLayout()
 end
 
-function PANEL:ToUpperUTF8(str)
-    if not str or str == "" then return "" end
-    
-    local res = ""
-    for _, cp in utf8.codes(str) do
-        if cp >= 97 and cp <= 122 then
-            cp = cp - 32
-        elseif cp >= 1072 and cp <= 1103 then
-            cp = cp - 32
-        elseif cp == 1105 then
-            cp = 1025
-        end
-        res = res .. utf8.char(cp)
+function PANEL:GetTargetOffset()
+    local available = self:GetWide() - self.Padding * 2
+    if self.FullListWidth <= available then return (self:GetWide() - self.FullListWidth) / 2 end
+    local selected = self.WeaponData[self.Selected]
+    if not selected then return self.Padding end
+    local center = self:GetWide() / 2 - selected.x - selected.width / 2
+    return math.Clamp(center, self:GetWide() - self.Padding - self.FullListWidth, self.Padding)
+end
+
+function PANEL:SetSelected(index, forceSound)
+    index = math.Clamp(tonumber(index) or 1, 1, math.max(1, #self.Weapons))
+    local changed = index ~= self.Selected
+    self.Selected = index
+    if (changed or forceSound) and isstring(self.ScrollSound) and self.ScrollSound ~= "" then
+        surface.PlaySound(self.ScrollSound)
     end
-    return res
+    return changed
+end
+
+function PANEL:Think()
+    if self.ScreenWidth ~= ScrW() or self.ScreenHeight ~= ScrH() then
+        self:UpdateLayout()
+        self:CacheWeaponNames()
+        self.ScrollOffset = self:GetTargetOffset()
+    end
+    local ply = LocalPlayer()
+    if not IsValid(ply) or not ply:Alive() or (self.HideAt and CurTime() >= self.HideAt) then self.TargetAlpha = 0 end
+    self.CurrentAlpha = math.Approach(self.CurrentAlpha, self.TargetAlpha, FrameTime() * 1500)
+    self:SetAlpha(self.CurrentAlpha)
+    self.ScrollOffset = Lerp(math.min(1, FrameTime() * 14), self.ScrollOffset, self:GetTargetOffset())
 end
 
 function PANEL:Paint(w, h)
-    self.CurrentAlpha = Lerp(FrameTime() * 10, self.CurrentAlpha, self.TargetAlpha)
     if self.CurrentAlpha <= 0 then return end
-    
-    local alpha = self.CurrentAlpha / 255
-    local c = BW.Config.Colors
+    local c = self.Colors
+    draw.RoundedBox(10, 0, 0, w, h, c.Background)
+    BW.Utils.DrawRoundedOutline(10, 0, 0, w, h, c.Border)
 
-    draw.RoundedBox(8, 0, 0, w, h, Color(c.DarkGray35.r, c.DarkGray35.g, c.DarkGray35.b, 240 * alpha))
-    draw.RoundedBoxEx(8, 0, 0, w, 1, Color(c.Gray50.r, c.Gray50.g, c.Gray50.b, 150 * alpha), true, true, false, false)
-
-    local title = self:ToUpperUTF8(Translate("WeaponSelectorTitle", "WEAPONS") .. "  •  " .. #self.Weapons)
-    draw.SimpleText(title, "Inter12", w / 2, 10, Color(c.White.r, c.White.g, c.White.b, 200 * alpha), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-
-    if self.FullListWidth == 0 then return end
-
-    local targetOffset = 0
-    if self.FullListWidth < (w - 60) then
-        targetOffset = (w - self.FullListWidth) / 2
-    else
-        local selectedData = self.WeaponData[self.Selected] or { width = 0, x = 0 }
-        local idealOffset = (w / 2) - selectedData.x - (selectedData.width / 2)
-        targetOffset = math.Clamp(idealOffset, (w - 30) - self.FullListWidth, 30)
-    end
-
-    self.ScrollOffset = Lerp(FrameTime() * 12, self.ScrollOffset, targetOffset)
-
-    local cyanPill = Color(c.Cyan.r, c.Cyan.g, c.Cyan.b, 40 * alpha)
-    local whiteText = Color(c.White.r, c.White.g, c.White.b, 255 * alpha)
-    local grayText  = Color(c.Gray100.r, c.Gray100.g, c.Gray100.b, 255 * alpha)
-
-    local x = self.ScrollOffset
-    local centerY = (h / 2) + 5
-
-    for i, data in ipairs(self.WeaponData) do
-        if x > -data.width - 20 and x < w + 20 then
-            if self.Selected == i then
-                local pillW = data.width + 20
-                local pillH = 26
-                draw.RoundedBox(13, x - 10, centerY - (pillH / 2), pillW, pillH, cyanPill)
-                draw.SimpleText(data.name, "Inter16", x, centerY, whiteText, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            else
-                draw.SimpleText(data.name, "Inter16", x, centerY, grayText, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-            end
+    -- Clip only the scrolling cards; leave the rounded outer frame untouched.
+    local screenX, screenY = self:LocalToScreen(self.Padding, self.Padding)
+    render.SetScissorRect(screenX, screenY, screenX + w - self.Padding * 2, screenY + self.CardHeight, true)
+    for index, data in ipairs(self.WeaponData) do
+        local x, y = self.ScrollOffset + data.x, self.Padding
+        if x + data.width <= self.Padding or x >= w - self.Padding then continue end
+        local selected = self.Selected == index
+        if selected then
+            draw.RoundedBox(6, x, y, data.width, self.CardHeight, c.Selected)
+            BW.Utils.DrawRoundedOutline(6, x, y, data.width, self.CardHeight, c.SelectedBorder)
         end
-        x = x + data.width + 25
+        draw.SimpleText(data.name, "Inter16", x + data.width / 2, y + self.CardHeight / 2, selected and c.Accent or c.White, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
     end
+    render.SetScissorRect(0, 0, 0, 0, false)
 end
 
 function PANEL:ShowSelector()
-    self.TargetAlpha = 255
+    local opening = self.TargetAlpha == 0
     self:UpdateWeapons()
-
-    local timerName = "WeaponSelectorHide"
-    timer.Remove(timerName)
-    timer.Create(timerName, 2.5, 1, function()
-        if IsValid(self) then
-            self.TargetAlpha = 0
+    if #self.Weapons == 0 then self.TargetAlpha = 0 return end
+    if opening then
+        local ply = LocalPlayer()
+        local active = IsValid(ply) and ply:GetActiveWeapon() or NULL
+        for index, wep in ipairs(self.Weapons) do
+            if wep == active then self.Selected = index break end
         end
-    end)
+        self.ScrollOffset = self:GetTargetOffset()
+    end
+    self.TargetAlpha = 255
+    self.HideAt = CurTime() + self.HideDelay
 end
 
 vgui.Register("WeaponSelector", PANEL, "EditablePanel")

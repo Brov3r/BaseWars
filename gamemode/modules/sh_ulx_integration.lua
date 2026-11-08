@@ -194,7 +194,7 @@ function MODULE:AddCommands()
     end
     local addmoney = ulx.command(CATEGORY_NAME, "ulx addmoney", ulx.addmoney, "!addmoney")
     addmoney:addParam{type = ULib.cmds.PlayersArg}
-    addmoney:addParam{type = ULib.cmds.NumArg, min = 0, max = 1000000000000, hint = "Money", ULib.cmds.round}
+    addmoney:addParam{type = ULib.cmds.NumArg, min = 0, max = BW.Config.Economy.MaxMoney, hint = "Money", ULib.cmds.round}
     addmoney:defaultAccess(ULib.ACCESS_ADMIN)
     addmoney:help("Give money to player(s).")
 
@@ -209,7 +209,7 @@ function MODULE:AddCommands()
     end
     local takemoney = ulx.command(CATEGORY_NAME, "ulx takemoney", ulx.takemoney, "!takemoney")
     takemoney:addParam{type = ULib.cmds.PlayersArg}
-    takemoney:addParam{type = ULib.cmds.NumArg, min = 0, max = 1000000000000, hint = "Money", ULib.cmds.round}
+    takemoney:addParam{type = ULib.cmds.NumArg, min = 0, max = BW.Config.Economy.MaxMoney, hint = "Money", ULib.cmds.round}
     takemoney:defaultAccess(ULib.ACCESS_ADMIN)
     takemoney:help("Take money from player(s).")
 
@@ -224,7 +224,7 @@ function MODULE:AddCommands()
     end
     local setmoney = ulx.command(CATEGORY_NAME, "ulx setmoney", ulx.setmoney, "!setmoney")
     setmoney:addParam{type = ULib.cmds.PlayersArg}
-    setmoney:addParam{type = ULib.cmds.NumArg, min = 0, max = 1000000000000, hint = "Money", ULib.cmds.round}
+    setmoney:addParam{type = ULib.cmds.NumArg, min = 0, max = BW.Config.Economy.MaxMoney, hint = "Money", ULib.cmds.round}
     setmoney:defaultAccess(ULib.ACCESS_SUPERADMIN)
     setmoney:help("Set player's money.")
 

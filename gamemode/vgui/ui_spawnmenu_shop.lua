@@ -268,13 +268,11 @@ function ITEM_PANEL:DoClick()
 
     if vip and not hasPrivilege then
         if ply.Notify then ply:Notify(NOTIFY_ERROR, Translate("Shop.VIPAlert", "This item is only available for VIP!"), 5) end
-        surface.PlaySound("buttons/button10.wav")
         return
     end
 
     if not hasLevel then
         if ply.Notify then ply:Notify(NOTIFY_ERROR,  Translate("Shop.LvlAlert", "Insufficient level!"), 5) end
-        surface.PlaySound("buttons/button10.wav")
         return
     end
 
@@ -285,14 +283,12 @@ function ITEM_PANEL:DoClick()
             if ply.Notify then 
                 ply:Notify(NOTIFY_ERROR, string.format(Translate("Shop.MaxLimitAlert", "You have reached the limit for this item! (Max: %s)"), tostring(maxLimit)), 5) 
             end
-            surface.PlaySound("buttons/button10.wav")
             return 
         end
     end
 
     if not hasMoney then
         if ply.Notify then ply:Notify(NOTIFY_ERROR,  Translate("Shop.MoneyAlert", "Insufficient money!"), 5) end
-        surface.PlaySound("buttons/button10.wav")
         return
     end
 

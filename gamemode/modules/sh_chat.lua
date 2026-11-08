@@ -49,21 +49,25 @@ function MODULE:Init()
         util.AddNetworkString("BW_CustomChat_Message")
 
         net.Receive("BW_CustomChat_Send", function(len, ply)
+            if not BW.Utils.AllowRequest(ply, "chat", 0.75, 3, len, BW.Config.Chat.MaxMessageLenght + 4) then return end
             if not IsValid(ply) then return end
 
             local text = net.ReadString()
             local isTeam = net.ReadBool()
 
             text = string.Trim(text)
+            text = text:gsub("[%c]", " ")
+            if not utf8.len(text) then return end
             if text == "" then return end
             if string.len(text) > BW.Config.Chat.MaxMessageLenght then
-                text = string.sub(text, 1, BW.Config.Chat.MaxMessageLenght)
+                return
             end
 
             local result = hook.Run("PlayerSay", ply, text, isTeam)
 
             if result == false or result == "" then return end
             if isstring(result) then text = result end
+            if #text > BW.Config.Chat.MaxMessageLenght or not utf8.len(text) then return end
 
             local isDead = not ply:Alive()
 
@@ -119,7 +123,7 @@ function MODULE:Init()
 
     hook.Add("OnScreenSizeChanged", "ChatBox_Repos", function()
         if IsValid(MODULE.ChatBox) then 
-            MODULE.ChatBox:SetPos(BW.Config.Chat.HPosOffset, ScrH() - BW.Config.Chat.VPosOffset) 
+            MODULE.ChatBox:ApplyGeometry()
         end
     end)
 
@@ -145,8 +149,7 @@ function MODULE:Init()
         local text = net.ReadString()
         local isTeam = net.ReadBool()
         local isDead = net.ReadBool()
-
-        
+        text = BW.Utils.EscapeMarkup(text):gsub("‹#(%x%x%x%x%x%x)›", "<#%1>")
         if string.find(text, "<#%x%x%x%x%x%x>") then
             local parsedArgs = MODULE:ParseStringToChatArgs(text)
             local formattedStr = ""
@@ -171,6 +174,7 @@ function MODULE:Init()
             text = formattedStr
         end
 
+        if not IsValid(MODULE.ChatBox) then MODULE.ChatBox = vgui.Create("ChatBox") end
         MODULE.ChatBox:HandleMessage(ply, text, isTeam, isDead)
     end)
 
@@ -178,7 +182,8 @@ function MODULE:Init()
 end
 
 function MODULE:OverrideAddText()
-     local oldAddText = chat.AddText
+    BW.OriginalChatAddText = BW.OriginalChatAddText or chat.AddText
+    local oldAddText = BW.OriginalChatAddText
     function chat.AddText(...)
         local args = {...}
         local processedArgs = {}
@@ -218,13 +223,13 @@ function MODULE:OverrideAddText()
             MODULE.ChatBox:HandleMessage(nil, mStr, false, false)
         end
 
-        -- oldAddText(...)
+        oldAddText(unpack(processedArgs))
     end    
 end
 
 function MODULE:ChatTextHandler(ply, text, isTeam, isDead)
     if IsValid(MODULE.ChatBox) then 
-        MODULE.ChatBox:HandleMessage(ply, text, isTeam, isDead)
+        MODULE.ChatBox:HandleMessage(ply, BW.Utils.EscapeMarkup(text), isTeam, isDead)
         return true
     end
 end
