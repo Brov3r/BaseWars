@@ -1,19 +1,47 @@
 BW.Config = {
     Fonts = { "Inter" },
-    Map = { RemoveDoors = true, RemoveGlass = true },
+    Map = { RemoveDoors = false, RemoveGlass = false },
     -- Preserve the original height limits; individual maps may override Default.
     MapZones = {
         Default = {
             Enabled = true,
             MinZ = -450,
+            -- Optional visual water height. Defaults to MinZ when omitted.
+            -- WaterZ = -450,
             MaxZ = 1500,
             DamageMultiplier = 0.2,
             DrawWater = true,
             HalfSize = 16384,
-            DrawDistance = 5000
+            DrawDistance = 2800
         }
     },
     Ownership = { RemoveOnDisconnect = true },
+    -- Optional CPPI compatible prop access layer.
+    -- Set Enabled = false to restore the default owner-only behaviour.
+    CPPI = {
+        Enabled = true,
+        -- Maximum individual recipients per permission. 0 disables grants.
+        MaxFriends = 32,
+        Persist = true,
+        -- Admins bypass prop ownership checks.
+        AdminBypass = true,
+        -- Restrict pressing E on owned entities to the owner and permitted players.
+        EnforceUse = true,
+        AdminManagePermissions = true,
+        AdminManageOwnership = true,
+        -- Delay in seconds before props of a disconnected player are removed.
+        -- The timer is cancelled if the player reconnects.
+        CleanupDelay = 600,
+        -- Permissions for map entities (owner = World). Admins can change
+        -- these at runtime from the Utilities tab or with bw_cppi_world.
+        WorldPermissions = {
+            all = false,
+            physgun = false,
+            gravgun = false,
+            tool = false,
+            use = true,
+        },
+    },
     Scoreboard = {
         Opacity = 0.95,
         PanelWidth = 1060,
@@ -102,6 +130,19 @@ BW.Config = {
         AvatarCornerOffset  = 20,
         AnimTime            = 0.2,
         DrawEntInfoDistance = 100,
+        ScaleBaseHeight     = 1080,
+        ScaleMin            = 1,
+        ScaleMax            = 2,
+    },
+    ThirdPerson = {
+        Enabled            = true,
+        Distance           = 50,
+        ShoulderOffset     = 20,
+        HeightOffset       = 0,
+        CollisionRadius    = 6,
+        CollisionPadding   = 6,
+        SmoothSpeed        = 14,
+        DrawViewerDistance = 24,
     },
     Chat = {
         VPosOffset = 420,
@@ -205,7 +246,13 @@ BW.Config = {
         SpawnRadiusSqr = 100 ^ 2,
         MoneyForceProtection = 50000,
         TimeProtection = 120,
-        ProtectionMat = "models/props_combine/com_shield001a"
+        ProtectionMat = "models/props_combine/com_shield001a",
+        SpawnPropRemoval = {
+            Enabled = true,
+            -- How often to scan owned entities that were moved into the zone.
+            ScanInterval = 2,
+            IgnoreAdmins = false,
+        },
     },
     Advert = {
         DelayTime = 240,
@@ -264,13 +311,72 @@ BW.Config = {
         FadeSpeed = 12,
         Scale     = 0.18,
     },
+    Banner = {
+        -- Shared banner style. Per-map placement entries may override any field.
+        Style = {
+            Enabled       = true,
+            Width         = 2720,
+            Height        = 1270,
+            Scale         = 0.1,
+            Distance      = 3000,
+            FadeDistance  = 500,
+            FontSize      = 120,
+            SmallFontSize = 90,
+            Padding       = 100,
+            TitleY        = 120,
+            SeparatorY    = 220,
+            LineStartY    = 300,
+            LineFirstY    = 350,
+            LineSpacing   = 140,
+            CornerRadius  = 20,
+            BorderWidth   = 12,
+            Background    = Color(0, 0, 0, 230),
+            Border        = Color(255, 165, 0, 255),
+            TitleColor    = Color(255, 165, 0, 255),
+            TextColor     = Color(255, 255, 255, 255),
+            AccentColor   = Color(0, 255, 255, 255),
+        },
+        -- Banners are defined per map; multiple entries are allowed.
+        -- Maps without an entry get no banner.
+        Maps = {
+            ["rp_bangclaw"] = {
+                {
+                    Position = Vector(-1671, -1320, 191),
+                    Angles   = Angle(0, 90, 90),
+                },
+                -- Second banner example:
+                -- {
+                --     Position = Vector(0, 0, 0),
+                --     Angles   = Angle(0, 0, 0),
+                -- },
+            },
+        },
+    },
+    Render = {
+        Enabled = true,
+        FarZ = 3600,
+        MaxRenderableDistance = 3100,
+        Disable3DSky = true,
+    },
     Fog = {
         Enabled    = true,
         Mode       = MATERIAL_FOG_LINEAR,
         Start      = 1500,
-        ["End"]    = 3000,
+        ["End"]    = 2800,
         MaxDensity = 1,
         Color      = Color(191, 191, 191),
+        Water      = {
+            Enabled         = true,
+            Color           = Color(24, 104, 108),
+            Start           = 0,
+            ["End"]         = 500,
+            MaxDensity      = 0.9,
+            OverlayAlpha    = 150,
+            SurfaceAlpha    = 230,
+            FadeTime        = 0.25,
+            Refract         = true,
+            RefractDistance = 1800,
+        },
     },
     Props = {
         ["building_blocks"] = {

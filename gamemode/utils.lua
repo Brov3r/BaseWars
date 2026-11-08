@@ -20,6 +20,19 @@ function BW.Utils.IsFinite(value)
     return isnumber(value) and value == value and value > -math.huge and value < math.huge
 end
 
+-- Scale the HUD from a 1080p baseline, but never shrink below it on
+-- lower-resolution screens. 720p therefore renders at 1.0x.
+function BW.Utils.GetHUDScale()
+    if not ScrH then return 1 end
+    local hud = (BW.Config and BW.Config.HUD) or {}
+    local base = tonumber(hud.ScaleBaseHeight) or 1080
+    if base <= 0 then base = 1080 end
+    local minScale = tonumber(hud.ScaleMin) or 1
+    local maxScale = tonumber(hud.ScaleMax) or 2
+    if minScale > maxScale then minScale, maxScale = maxScale, minScale end
+    return math_Clamp(ScrH() / base, minScale, maxScale)
+end
+
 function BW.Utils.UTF8Sub(text, first, last)
     text = tostring(text or "")
     if not utf8.len(text) then return "" end

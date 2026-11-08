@@ -283,7 +283,7 @@ function MODULE:InitServer()
         if not config.AllowedTools[string.lower(toolName)] then
             return false
         end
-        if IsValid(tr.Entity) and not tr.Entity:IsWorld() and not BW.Ownership.CanModify(ply, tr.Entity) then return false end
+        if IsValid(tr.Entity) and not tr.Entity:IsWorld() and not BW.Ownership.CanModify(ply, tr.Entity, "Tool") then return false end
         if toolName == "stacker_improved" and not ply:CheckLimit("props") then return false end
     end)
     -- UI restrictions are not security boundaries. Block standard Sandbox spawning too.

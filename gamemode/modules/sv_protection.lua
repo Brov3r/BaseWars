@@ -202,6 +202,30 @@ function MODULE:Init()
     hook.Add("PlayerSpawnedVehicle", "BW_Protection_RemoveOnSpawn", function(ply) self:StripProtection(ply) end)
     hook.Add("PlayerSpawnedNPC", "BW_Protection_RemoveOnSpawn", function(ply) self:StripProtection(ply) end)
 
+    for _, event in ipairs({"PlayerSpawnedProp", "PlayerSpawnedSENT", "PlayerSpawnedVehicle", "PlayerSpawnedNPC", "PlayerSpawnedRagdoll"}) do
+        hook.Add(event, "BW_Protection_SpawnZoneRemoval", function(ply, first, second)
+            local ent = isentity(second) and second or first
+            if IsValid(ent) then self:RemoveSpawnZoneEntity(ply, ent) end
+        end)
+    end
+
+    timer.Remove("BW_Protection_SpawnZoneScan")
+    timer.Create("BW_Protection_SpawnZoneScan", math.max(0.5, tonumber((BW.Config.Protection.SpawnPropRemoval or {}).ScanInterval) or 2), 0, function()
+        local config = BW.Config.Protection.SpawnPropRemoval
+        if not config or config.Enabled == false then return end
+
+        for _, objects in pairs(BW.Ownership.BySteamID) do
+            local pending = {}
+            for ent in pairs(objects) do pending[#pending + 1] = ent end
+
+            for _, ent in ipairs(pending) do
+                if IsValid(ent) and not ent._IsHeld and self:IsPositionNearSpawn(ent:GetPos()) then
+                    self:RemoveSpawnZoneEntity(nil, ent)
+                end
+            end
+        end
+    end)
+
     hook.Add("PlayerSpawn", "BW_Protection_SpawnLogic", function(ply)
         if not IsValid(ply.BW_LinkedSpawn) and not ply.BW_Resurrecting then self:RegisterWorldSpawn(ply:GetPos()) end
         self:CheckAndApplyProtection(ply)
@@ -237,19 +261,48 @@ function MODULE:RegisterWorldSpawn(position)
     self.SpawnPoints[#self.SpawnPoints + 1] = Vector(position.x, position.y, position.z)
 end
 
-function MODULE:IsNearWorldSpawn(ply)
-    if not IsValid(ply) then return false end
+function MODULE:IsPositionNearSpawn(position)
+    if not position then return false end
     if not self.SpawnPoints then self:CollectSpawnPoints() end
     if #self.SpawnPoints == 0 then return false end
 
-    local plyPos = ply:GetPos()
     local radiusSqr = BW.Config.Protection.SpawnRadiusSqr
     for _, spawnPos in ipairs(self.SpawnPoints) do
-        if plyPos:DistToSqr(spawnPos) <= radiusSqr then
+        if position:DistToSqr(spawnPos) <= radiusSqr then
             return true
         end
     end
     return false
+end
+
+function MODULE:IsNearWorldSpawn(ply)
+    if not IsValid(ply) then return false end
+    return self:IsPositionNearSpawn(ply:GetPos())
+end
+
+function MODULE:RemoveSpawnZoneEntity(ply, ent)
+    local config = BW.Config.Protection.SpawnPropRemoval
+    if not config or config.Enabled == false then return end
+    if not IsValid(ent) or ent:IsPlayer() or ent:IsWorld() or ent:CreatedByMap() then return end
+    if ent._IsHeld or not self:IsPositionNearSpawn(ent:GetPos()) then return end
+
+    local owner = BW.Ownership.GetOwner(ent)
+    if not IsValid(owner) and IsValid(ply) then owner = ply end
+    if config.IgnoreAdmins ~= false and IsValid(owner) and owner:IsAdmin() then return end
+
+    local className = ent:GetClass()
+    ent:Remove()
+
+    if IsValid(owner) and owner.Notify then
+        owner:Notify(
+            NOTIFY_ERROR,
+            string.format(
+                Translate("Protection.SpawnZoneRemoved", "The prop %s was removed because it was in the spawn zone."),
+                className
+            ),
+            5
+        )
+    end
 end
 
 function MODULE:OnPhysgunPickup(ply, ent)
@@ -258,7 +311,7 @@ function MODULE:OnPhysgunPickup(ply, ent)
     if ent:CreatedByMap() then return end
 
     if ent.BlockPhysGun then return false  end
-    if not BW.Ownership.CanModify(ply, ent) then return false end
+    if not BW.Ownership.CanModify(ply, ent, "Physgun") then return false end
 
 
     local class = ent:GetClass()
@@ -296,6 +349,7 @@ function MODULE:OnPhysgunDrop(ply, ent)
     timer.Simple(BW.Config.Protection.UnghostDelay, function()
         if IsValid(ent) and MODULE and MODULE.AttemptUnghost then
             MODULE:AttemptUnghost(ent)
+            MODULE:RemoveSpawnZoneEntity(ply, ent)
         end
     end)
 end

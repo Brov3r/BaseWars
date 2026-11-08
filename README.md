@@ -26,6 +26,7 @@ All settings are in [`gamemode/config.lua`](./gamemode/config.lua).
 | `MapZones.Default` | Damage above and below height limits |
 | `Economy.MaxMoney` | Maximum player balance |
 | `Ownership.RemoveOnDisconnect` | Remove owned entities on disconnect |
+| `CPPI` | Optional prop access layer: friend access and admin tools |
 | `Notify` | Notification queue, opacity and sound |
 | `Scoreboard`, `WeaponSelector`, `Chat` | Interface and chat settings |
 

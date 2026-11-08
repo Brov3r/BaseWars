@@ -20,18 +20,47 @@ function PANEL:Init()
 end
 
 function PANEL:PerformLayout(w, h)
-    local padding = BW.Config.HUD.Dimensions.AvatarPadding
-    self.base:SetPos(padding, padding)
-    self.base:SetSize(w - padding * 2, h - padding * 2)
+    local dims = BW.Config.HUD.Dimensions
+    local scale = BW.Utils.GetHUDScale and BW.Utils.GetHUDScale() or 1
+    local padding = math.max(1, math.floor((dims.AvatarPadding or 10) * scale + 0.5))
+    self.Padding = padding
+    self.ExpWidth = math.max(2, math.floor((dims.AvatarExpWidth or 10) * scale + 0.5))
+
+    if IsValid(self.base) then
+        self.base:SetPos(padding, padding)
+        self.base:SetSize(math.max(1, w - padding * 2), math.max(1, h - padding * 2))
+    end
+
+    self:CacheGeometry(w, h)
+end
+
+function PANEL:CacheGeometry(w, h)
+    local cx, cy = w / 2, h / 2
+    local rOut = math.max(2, h / 2 - 1)
+    local rIn = math.max(1, rOut - (self.ExpWidth or 10))
+
+    if self.GeomW == w and self.GeomH == h and self.GeomRIn == rIn then return end
+    self.GeomW, self.GeomH, self.GeomRIn = w, h, rIn
+    self.CenterX, self.CenterY = cx, cy
+    self.RadiusOuter, self.RadiusInner = rOut, rIn
+    self.PolyOuter = GetHexPoly(cx, cy, rOut)
+    self.PolyInner = GetHexPoly(cx, cy, rIn)
+    self.PolyBase = GetHexPoly(cx, cy, math.max(1, rIn - 1))
 end
 
 function PANEL:Paint(w, h)
-    local cx, cy = w / 2, h / 2
-    local r_out = h / 2 - 1
-    local r_in = r_out - (BW.Config.HUD.Dimensions.AvatarExpWidth or 4)
+    local progress = tonumber(self.XPProgress) or 0
+    if progress ~= progress then progress = 0 end
+    progress = math.Clamp(progress, 0, 1)
+
+    if not self.PolyOuter or self.GeomW ~= w or self.GeomH ~= h then
+        self:CacheGeometry(w, h)
+    end
+
+    local cx, cy = self.CenterX, self.CenterY
+    local r_out = self.RadiusOuter
     
     local cols = BW.Config and BW.Config.Colors or {}
-    local progress = math.Clamp(self.XPProgress or 0, 0, 1)
 
 
     render.ClearStencil()
@@ -47,12 +76,12 @@ function PANEL:Paint(w, h)
 
     draw.NoTexture()
     surface.SetDrawColor(255, 255, 255)
-    surface.DrawPoly(GetHexPoly(cx, cy, r_out))
+    surface.DrawPoly(self.PolyOuter)
 
     render.SetStencilFailOperation(STENCILOPERATION_DECR)
     render.SetStencilPassOperation(STENCILOPERATION_DECR)
     render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_ALWAYS)
-    surface.DrawPoly(GetHexPoly(cx, cy, r_in))
+    surface.DrawPoly(self.PolyInner)
 
     render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_EQUAL)
     render.SetStencilReferenceValue(1)
@@ -62,7 +91,6 @@ function PANEL:Paint(w, h)
     surface.SetDrawColor(cols.DarkGray30 or Color(30, 30, 30, 255))
     surface.DrawRect(0, 0, w, h)
 
-    local progress = math.Clamp(self.XPProgress or 0, 0, 1)
     if progress > 0 then
         surface.SetDrawColor(cols.Amber or Color(255, 193, 7, 255))
         if progress >= 1 then
@@ -97,7 +125,7 @@ function PANEL:Paint(w, h)
     render.SetStencilReferenceValue(1)
 
     surface.SetDrawColor(255, 255, 255)
-    surface.DrawPoly(GetHexPoly(cx, cy, r_in - 1))
+    surface.DrawPoly(self.PolyBase)
 
     render.SetStencilCompareFunction(STENCILCOMPARISONFUNCTION_EQUAL)
     

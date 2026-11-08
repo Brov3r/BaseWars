@@ -1,75 +1,203 @@
-local MODULE = MODULE 
+local MODULE = MODULE
 
 MODULE.Name = "Banner"
 MODULE.Author = "Brov3r"
 
-MODULE.BannerConfig = {
-	pos = Vector(-1671, -1320, 191), 
-	ang = Angle(0, 90, 90), 
-	height = 1270,
-	width = 2720,
-	font = "BW_BannerFont",
-	distance = 2500,
+local FALLBACK_LINES = {
+    "Welcome! The main menu is on Q.",
+    "Shop / FAQ / rules: Q",
+    "Commands & factions: F4",
+    "Third person: ALT",
+    "Economy: /sell — sell items",
+    "Money: /dropmoney [amount]",
 }
-   
+
+local function WithAlpha(color, alpha)
+    return Color(color.r, color.g, color.b, (color.a or 255) * alpha)
+end
+
+local function Merge(base, override)
+    local result = {}
+    for key, value in pairs(base or {}) do result[key] = value end
+    for key, value in pairs(override or {}) do result[key] = value end
+    return result
+end
+
+local function GetViewOrigin()
+    local thirdPerson = BW.ThirdPerson
+    if thirdPerson and thirdPerson.Active and thirdPerson.ViewOrigin then
+        return thirdPerson.ViewOrigin
+    end
+
+    local ply = LocalPlayer()
+    return IsValid(ply) and ply:EyePos() or nil
+end
+
+function MODULE:GetBannerFont(size)
+    size = math.max(8, math.floor(tonumber(size) or 120))
+    local name = self.FontCache[size]
+    if not name then
+        local fontFamily = (BW.Config.Fonts and BW.Config.Fonts[1]) or "Inter"
+        name = "BW_BannerFont_" .. size
+        surface.CreateFont(name, {
+            font = fontFamily,
+            extended = true,
+            size = size,
+            weight = 800,
+            antialias = true,
+            shadow = true,
+        })
+        self.FontCache[size] = name
+    end
+    return name
+end
+
+function MODULE:BuildText()
+    self.Title = Translate("Banner.Title", "Welcome to BaseWars!")
+    self.Lines = {}
+
+    for i = 1, #FALLBACK_LINES do
+        local text = Translate("Banner.Line" .. i, FALLBACK_LINES[i])
+        if text and text ~= "" then
+            local label, value = string.match(text, "^(.-):%s+(.*)$")
+            self.Lines[#self.Lines + 1] = label and {label = label, value = value} or {text = text}
+        end
+    end
+end
+
 function MODULE:Init()
-	local banner = self.BannerConfig
+    local root = BW.Config.Banner or {}
+    local style = root.Style or {}
+    local mapBanners = (root.Maps or {})[game.GetMap()]
+    if not mapBanners or style.Enabled == false then return end
+    if type(mapBanners) ~= "table" then return end
+    if mapBanners.Position then mapBanners = { mapBanners } end
 
-	surface.CreateFont("BW_BannerFont", {
-        font = "Inter",
-        extended = true,
-        size = 120,
-        weight = 800,
-        antialias = true,
-        shadow = true,
-    })
+    self.Banners = {}
+    self.FontCache = {}
 
-	surface.CreateFont("BW_BannerFontSmall", {
-        font = "Inter",
-        extended = true,
-        size = 90,
-        weight = 800,
-        antialias = true,
-        shadow = true,
-    })
+    for _, entry in ipairs(mapBanners) do
+        if type(entry) == "table" then
+            local banner = Merge(style, entry)
+            if banner.Enabled ~= false and isvector(banner.Position) and isangle(banner.Angles) then
+                banner.Font = self:GetBannerFont(banner.FontSize)
+                banner.SmallFont = self:GetBannerFont(banner.SmallFontSize)
+                self.Banners[#self.Banners + 1] = banner
+            end
+        end
+    end
 
-    hook.Add("PostDrawOpaqueRenderables", "BW_DrawBanners", function()
+    if #self.Banners == 0 then return end
+
+    self:BuildText()
+
+    if GetConVar("gmod_language") then
+        cvars.AddChangeCallback("gmod_language", function()
+            self:BuildText()
+        end, "BW_Banner_RefreshText")
+    end
+
+    hook.Add("PostDrawOpaqueRenderables", "BW_DrawBanners", function(bDrawingDepth)
+        -- Only skip the depth pass. The skybox flags are unreliable with r_3dsky 0.
+        if bDrawingDepth then return end
         local ply = LocalPlayer()
-		if not IsValid(ply) or not ply:Alive() then return end
+        if not IsValid(ply) or not ply:Alive() then return end
 
-		if ply:GetPos():DistToSqr(banner.pos) < banner.distance * banner.distance then 
-			self:DrawBanner(banner)
-		end
+        local playerPos = ply:GetPos()
+        local viewOrigin = GetViewOrigin()
+
+        for _, banner in ipairs(self.Banners) do
+            local distance = playerPos:Distance(banner.Position)
+            if viewOrigin then
+                distance = math.min(distance, viewOrigin:Distance(banner.Position))
+            end
+
+            local maxDistance = tonumber(banner.Distance) or 2500
+            if distance <= maxDistance then
+                local fadeDistance = math.max(0, tonumber(banner.FadeDistance) or 0)
+                local alpha = 1
+                if fadeDistance > 0 then
+                    local fadeStart = maxDistance - fadeDistance
+                    if distance > fadeStart then
+                        alpha = math.Clamp((maxDistance - distance) / fadeDistance, 0, 1)
+                    end
+                end
+
+                if alpha > 0.01 then
+                    self:DrawBanner(banner, alpha)
+                end
+            end
+        end
     end)
 end
 
-function MODULE:DrawBanner(b) 
-    cam.Start3D2D(b.pos, b.ang, 0.1)
-        draw.RoundedBox(20, 0, 0, b.width, b.height, Color(0, 0, 0, 230))
-        surface.SetDrawColor(255, 165, 0, 255)
-        surface.DrawOutlinedRect(0, 0, b.width, b.height, 12)
-        
-        draw.SimpleText(Translate("Banner.Title", "Welcome to BaseWars!"), "BW_BannerFont", b.width / 2, 120, Color(255, 165, 0), TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
-        surface.DrawLine(100, 220, b.width - 100, 220)
+function MODULE:DrawBanner(b, alpha)
+    local width = tonumber(b.Width) or 2720
+    local height = tonumber(b.Height) or 1270
+    local padding = tonumber(b.Padding) or 100
+    local scale = tonumber(b.Scale) or 0.1
+    local lineStartY = tonumber(b.LineStartY) or 300
+    local lineFirstY = tonumber(b.LineFirstY) or 350
+    local lineSpacing = tonumber(b.LineSpacing) or 140
+    local borderColor = b.Border or Color(255, 165, 0, 255)
+    local textColor = b.TextColor or Color(255, 255, 255, 255)
+    local accentColor = b.AccentColor or Color(0, 255, 255, 255)
+    local titleColor = b.TitleColor or borderColor
 
-        local lines = {
-            Translate("Banner.Line1", "New here? Check out the Rules and FAQ (Q key)."),
-            Translate("Banner.Line2", "Shop: Q - Shop"),
-            Translate("Banner.Line3", "FAQ: Q - FAQ"),
-            Translate("Banner.Line4", "Rules: Q - Rules"),
-            Translate("Banner.Line5", "Commands: F4"),
-            Translate("Banner.Line6", "3rd Person: ALT"),
-        }
+    cam.Start3D2D(b.Position, b.Angles, scale)
+        draw.RoundedBox(
+            tonumber(b.CornerRadius) or 20,
+            0, 0, width, height,
+            WithAlpha(b.Background or Color(0, 0, 0, 230), alpha)
+        )
 
-        for i, line in ipairs(lines) do
-            local y = (i == 1) and 350 or (300 + (i * 140))
-            
-            if string.find(line, ": ") then
-                local split = string.Split(line, ": ")
-                draw.SimpleText(split[1], "BW_BannerFont", 100, y, color_white, TEXT_ALIGN_LEFT, TEXT_ALIGN_CENTER)
-                draw.SimpleText(split[2], "BW_BannerFont", b.width - 100, y, Color(0, 255, 255), TEXT_ALIGN_RIGHT, TEXT_ALIGN_CENTER)
+        surface.SetDrawColor(WithAlpha(borderColor, alpha))
+        surface.DrawOutlinedRect(0, 0, width, height, tonumber(b.BorderWidth) or 12)
+
+        draw.SimpleText(
+            self.Title or "",
+            b.Font,
+            width / 2,
+            tonumber(b.TitleY) or 120,
+            WithAlpha(titleColor, alpha),
+            TEXT_ALIGN_CENTER,
+            TEXT_ALIGN_CENTER
+        )
+
+        local separatorY = tonumber(b.SeparatorY) or 220
+        surface.DrawLine(padding, separatorY, width - padding, separatorY)
+
+        for i, line in ipairs(self.Lines or {}) do
+            local y = (i == 1) and lineFirstY or (lineStartY + i * lineSpacing)
+            if line.label then
+                draw.SimpleText(
+                    line.label,
+                    b.SmallFont,
+                    padding,
+                    y,
+                    WithAlpha(textColor, alpha),
+                    TEXT_ALIGN_LEFT,
+                    TEXT_ALIGN_CENTER
+                )
+                draw.SimpleText(
+                    line.value,
+                    b.SmallFont,
+                    width - padding,
+                    y,
+                    WithAlpha(accentColor, alpha),
+                    TEXT_ALIGN_RIGHT,
+                    TEXT_ALIGN_CENTER
+                )
             else
-                draw.SimpleText(line, "BW_BannerFont", b.width / 2, y, color_white, TEXT_ALIGN_CENTER, TEXT_ALIGN_CENTER)
+                draw.SimpleText(
+                    line.text,
+                    b.SmallFont,
+                    width / 2,
+                    y,
+                    WithAlpha(textColor, alpha),
+                    TEXT_ALIGN_CENTER,
+                    TEXT_ALIGN_CENTER
+                )
             end
         end
     cam.End3D2D()

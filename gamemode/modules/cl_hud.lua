@@ -12,9 +12,31 @@ local config   = BW.Config
 local hud      = config.HUD
 local colors   = config.Colors
 local animTime = hud.AnimTime
-local margin   = hud.Margin
 local dim      = hud.Dimensions
 
+local HUD_FONT_MONEY         = "BW_HUD_Money"
+local HUD_FONT_STATS         = "BW_HUD_Stats"
+local HUD_FONT_AMMO          = "BW_HUD_Ammo"
+local HUD_FONT_AMMO_RESERVE  = "BW_HUD_AmmoReserve"
+
+local function RefreshHUDFonts(scale)
+    local family = (config.Fonts and config.Fonts[1]) or "Inter"
+
+    local function create(name, baseSize, weight)
+        surface.CreateFont(name, {
+            font = family,
+            size = math.max(8, math.floor(baseSize * scale + 0.5)),
+            extended = true,
+            weight = weight,
+            antialias = true
+        })
+    end
+
+    create(HUD_FONT_MONEY, 24, 900)
+    create(HUD_FONT_STATS, 18, 900)
+    create(HUD_FONT_AMMO, 28, 900)
+    create(HUD_FONT_AMMO_RESERVE, 18, 400)
+end
 
 local HiddenElementsLookup = {
     ["CHudHealth"] = true, 
@@ -37,6 +59,9 @@ function MODULE:Init()
     self.LastWeapon = nil
     self.LastW = 0
     self.LastH = 0
+    self.LastScale = nil
+    self.HUDFontScale = BW.Utils.GetHUDScale()
+    RefreshHUDFonts(self.HUDFontScale)
         
     hook.Add("HUDShouldDraw", "BW_HideElements", function(name)
         if HiddenElementsLookup[name] then return false end
@@ -133,52 +158,87 @@ function MODULE:DrawHUD()
 
     local wep = ply:GetActiveWeapon()
     if IsValid(wep) and wep:GetClass() == "gmod_camera" then
-        self.Avatar:SetVisible(false)
+        if IsValid(self.Avatar) then self.Avatar:SetVisible(false) end
         return
     end
 
-    if self.LastPly ~= ply then
-        self.Avatar:SetPlayer(ply, dim.Avatar)
-        self.LastPly = ply
-    end
-    self.Avatar:SetVisible(true)
-    
     local sh = ScrH()
     local sw = ScrW()
+    local scale = BW.Utils.GetHUDScale()
+    local margin = hud.Margin * scale
+    local avatarSize = math.max(1, math.floor(dim.Avatar * scale + 0.5))
 
-    if self.LastW ~= sw or self.LastH ~= sh then
-        self.LastW = sw
-        self.LastH = sh
-        self.Avatar:SetPos(margin, sh - dim.Avatar - margin)
+    local resized = self.LastW ~= sw or self.LastH ~= sh or self.LastScale ~= scale
+    if resized then
+        self.LastW, self.LastH, self.LastScale = sw, sh, scale
+        self.LastPly = nil
+
+        if self.HUDFontScale ~= scale then
+            RefreshHUDFonts(scale)
+            self.HUDFontScale = scale
+        end
+
+        if IsValid(self.Avatar) then
+            self.Avatar:SetSize(avatarSize, avatarSize)
+            self.Avatar:SetPos(margin, sh - avatarSize - margin)
+            self.Avatar:InvalidateLayout(true)
+        end
+    end
+
+    if IsValid(self.Avatar) then
+        if self.LastPly ~= ply then
+            self.Avatar:SetPlayer(ply, avatarSize)
+            self.LastPly = ply
+        end
+        self.Avatar:SetVisible(true)
     end
 
     local currentXP = ply.GetXP and ply:GetXP() or 0
     local maxXP     = ply.GetMaxXP and ply.GetMaxXP(ply) or 0
     local smoothXP  = BW.Utils.SmoothValue("hud_xp", currentXP, animTime)
-    self.Avatar.XPProgress = smoothXP / maxXP
+    local xpProgress = 0
+    if BW.Utils.IsFinite(maxXP) and maxXP > 0 and BW.Utils.IsFinite(smoothXP) then
+        xpProgress = math.Clamp(smoothXP / maxXP, 0, 1)
+    end
+    if IsValid(self.Avatar) then self.Avatar.XPProgress = xpProgress end
 
-    local blockTop = sh - margin - dim.Avatar + 5
-    local barX     = margin * 2 + dim.Avatar
-    local barW     = dim.HealthBarW
+    local blockTop = sh - margin - avatarSize + 5 * scale
+    local barX     = margin * 2 + avatarSize
+    local barMaxW  = math.max(1, sw - barX - margin)
+    local healthBarW = math.min(dim.HealthBarW * scale, barMaxW)
+    local healthBarH = dim.HealthBarH * scale
+    local armorBarW  = math.min(dim.ArmorBarW * scale, barMaxW)
+    local armorBarH  = dim.ArmorBarH * scale
+    local shadowOffset = math.max(1, 2 * scale)
+    local smallShadowOffset = math.max(1, scale)
 
     local smoothMoney = BW.Utils.SmoothValue("money", ply.GetMoney and ply:GetMoney() or 0, animTime)
     local moneyString = BW.Utils.NumWithSep(math.floor(smoothMoney))
-    BW.Utils.DrawShadowedText(config.Economy.Currency .. moneyString, "Inter24", barX, blockTop, colors.White, colors.Black, 2, 2, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    local moneyText = config.Economy.Currency .. moneyString
+    local moneyMaxWidth = math.max(1, sw - barX - margin)
+    surface.SetFont(HUD_FONT_MONEY)
+    if surface.GetTextSize(moneyText) > moneyMaxWidth then
+        moneyText = config.Economy.Currency .. BW.Utils.CompactNum(math.floor(smoothMoney))
+        if surface.GetTextSize(moneyText) > moneyMaxWidth then
+            moneyText = BW.Utils.TruncateText(moneyText, HUD_FONT_MONEY, moneyMaxWidth)
+        end
+    end
+    BW.Utils.DrawShadowedText(moneyText, HUD_FONT_MONEY, barX, blockTop, colors.White, colors.Black, shadowOffset, shadowOffset, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 
-    local armorBarY = blockTop + 26
+    local armorBarY = blockTop + 26 * scale
     local smoothArmor = BW.Utils.SmoothValue("hud_armor", ply:Armor(), animTime)
-    BW.Utils.DrawProgressBar(barX, armorBarY, dim.ArmorBarW, dim.ArmorBarH, 
+    BW.Utils.DrawProgressBar(barX, armorBarY, armorBarW, armorBarH,
         smoothArmor, 0, ply:GetMaxArmor(), colors.Cyan, colors.DarkGray)
 
-    local healthBarY = armorBarY + dim.ArmorBarH + 4
+    local healthBarY = armorBarY + armorBarH + 4 * scale
     local smoothHealth = BW.Utils.SmoothValue("hud_health", ply:Health(), animTime)
-    BW.Utils.DrawProgressBar(barX, healthBarY, dim.HealthBarW, dim.HealthBarH, 
+    BW.Utils.DrawProgressBar(barX, healthBarY, healthBarW, healthBarH,
         smoothHealth, 0, ply:GetMaxHealth(), colors.White, colors.DarkGray)
 
-    local statsY   = healthBarY + dim.HealthBarH + 6
-    local iconSize = dim.IconSize
-    local spacing  = 4
-    local fontName = "Inter18"
+    local statsY   = healthBarY + healthBarH + 6 * scale
+    local iconSize = dim.IconSize * scale
+    local spacing  = 4 * scale
+    local fontName = HUD_FONT_STATS
 
     surface.SetFont(fontName)
 
@@ -188,13 +248,13 @@ function MODULE:DrawHUD()
     surface.SetMaterial(lvlIcon)
     surface.SetDrawColor(255, 255, 255, 255)
     surface.DrawTexturedRect(barX, statsY, iconSize, iconSize)
-    BW.Utils.DrawShadowedText(levelStr, fontName, barX + iconSize + spacing, statsY - 1, 
-        colors.White, colors.Black, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+    BW.Utils.DrawShadowedText(levelStr, fontName, barX + iconSize + spacing, statsY - smallShadowOffset,
+        colors.White, colors.Black, smallShadowOffset, smallShadowOffset, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
 
     local currentRep = ply.GetReputation and ply:GetReputation() or 100
     local repStr     = tostring(currentRep)
-    local rightEdge  = barX + barW
-    local repW, _    = surface.GetTextSize(repStr)
+    local rightEdge  = barX + healthBarW
+    local repW       = surface.GetTextSize(repStr)
 
     local repIcon = heartMat
     if currentRep > 0 then
@@ -202,12 +262,13 @@ function MODULE:DrawHUD()
     elseif currentRep < 0 then
         repIcon = iconRepDown
     end
-    
+
+    local repIconX = math.max(barX, rightEdge - repW - spacing - iconSize)
     surface.SetMaterial(repIcon)
     surface.SetDrawColor(255, 255, 255, 255)
-    surface.DrawTexturedRect(rightEdge - repW - spacing - iconSize, statsY, iconSize, iconSize)
-    BW.Utils.DrawShadowedText(repStr, fontName, rightEdge, statsY - 1, 
-        colors.White, colors.Black, 1, 1, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+    surface.DrawTexturedRect(repIconX, statsY, iconSize, iconSize)
+    BW.Utils.DrawShadowedText(repStr, fontName, rightEdge, statsY - smallShadowOffset,
+        colors.White, colors.Black, smallShadowOffset, smallShadowOffset, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
 
 
     local weapon = ply:GetActiveWeapon()
@@ -229,8 +290,8 @@ function MODULE:DrawHUD()
         local smoothClip = BW.Utils.SmoothValue("clip", displayClip, animTime)
         local smoothReserve = BW.Utils.SmoothValue("reserve", displayReserve, animTime)
 
-        local ammoX = sw - 100
-        local ammoY = sh - 90
+        local ammoRight = sw - margin
+        local ammoY = sh - 90 * scale
 
         local clipColor, reserveColor
         if smoothClip <= 5 and smoothClip > 0 then
@@ -247,13 +308,13 @@ function MODULE:DrawHUD()
             reserveColor = colors.LightGray
         end
 
-        BW.Utils.DrawShadowedText(tostring(math.floor(smoothClip)), "Inter28",
-            ammoX + 10, ammoY,
-            clipColor, colors.Black, 2, 2, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
-            
-        BW.Utils.DrawShadowedText("/ " .. tostring(math.floor(smoothReserve)), "Inter18Thin",
-            ammoX + 10, ammoY + 32,
-            reserveColor, colors.Black, 1, 1, TEXT_ALIGN_LEFT, TEXT_ALIGN_TOP)
+        BW.Utils.DrawShadowedText(tostring(math.floor(smoothClip)), HUD_FONT_AMMO,
+            ammoRight, ammoY,
+            clipColor, colors.Black, shadowOffset, shadowOffset, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
+
+        BW.Utils.DrawShadowedText("/ " .. tostring(math.floor(smoothReserve)), HUD_FONT_AMMO_RESERVE,
+            ammoRight, ammoY + 32 * scale,
+            reserveColor, colors.Black, smallShadowOffset, smallShadowOffset, TEXT_ALIGN_RIGHT, TEXT_ALIGN_TOP)
 
     end
 end
@@ -332,18 +393,24 @@ function MODULE:DrawTargetInfo(targetEnt, alpha)
     local barFgColor = GetAlphaColor(colors.White)
 
     local ownerName = Translate("HUD.OwnerUnknown", "Unknown")
-    if CPPI and CPPI.GetName() == "Warden" then
-        ownerName = targetEnt:WardenGetOwnerName()
-        if targetEnt:WardenGetOwnerID() == "World" then
-            ownerName = Translate("HUD.WorldText", "World")
-        end
-    elseif targetEnt.CPPIGetOwner then
-        local cppiOwner = targetEnt:CPPIGetOwner()
+    if targetEnt.CPPIGetOwner then
+        local cppiOwner, cppiOwnerID = targetEnt:CPPIGetOwner()
         if IsValid(cppiOwner) and cppiOwner:IsPlayer() then
             ownerName = cppiOwner:Nick()
+        elseif cppiOwnerID == "World" or (IsValid(cppiOwner) and cppiOwner:IsWorld()) then
+            ownerName = Translate("HUD.WorldText", "World")
+        elseif targetEnt:CreatedByMap() then
+            ownerName = Translate("HUD.WorldText", "World")
         end
     elseif IsValid(targetEnt.Owner) then
         ownerName = targetEnt.Owner:Nick()
+    end
+
+    if ownerName == Translate("HUD.OwnerUnknown", "Unknown") then
+        local class = targetEnt:GetClass()
+        if class:find("^func_") or class == "prop_static" or class == "prop_dynamic" or class == "prop_dynamic_override" then
+            ownerName = Translate("HUD.WorldText", "World")
+        end
     end
 
     local maxHP = targetEnt:GetMaxHealth()

@@ -13,18 +13,36 @@ function ownership.GetOwner(ent)
         local owner = ent:CPPIGetOwner()
         if IsValid(owner) then return owner end
     end
+    if ent:IsWorld() or ent:CreatedByMap() then return game.GetWorld() end
     if IsValid(ent.Owner) then return ent.Owner end
     return ent:GetNWEntity("Owner")
 end
 
-function ownership.CanModify(ply, ent)
-    return IsValid(ply) and IsValid(ent) and not ent:IsPlayer()
-        and not ent:CreatedByMap() and ownership.GetOwner(ent) == ply
+function ownership.CanModify(ply, ent, permission)
+    if not IsValid(ply) or not IsValid(ent) or ent:IsPlayer() then return false end
+
+    local owner = ownership.GetOwner(ent)
+    if owner == game.GetWorld() then
+        if BW.CPPI and BW.CPPI.CheckPermission then return BW.CPPI.CheckPermission(ply, ent, permission) end
+        return false
+    end
+    if ent:CreatedByMap() then return false end
+    if owner == ply then return true end
+    if BW.CPPI and BW.CPPI.CheckPermission then return BW.CPPI.CheckPermission(ply, ent, permission) end
+    return false
 end
 
 function ownership.Track(ply, ent, itemID)
     if not IsValid(ply) or not IsValid(ent) then return end
     local sid = ply:SteamID64()
+    local oldSID = ent.BW_OwnerSteamID
+    if oldSID and oldSID ~= sid then
+        local oldObjects = ownership.BySteamID[oldSID]
+        if oldObjects then
+            oldObjects[ent] = nil
+            if not next(oldObjects) then ownership.BySteamID[oldSID] = nil end
+        end
+    end
     ownership.BySteamID[sid] = ownership.BySteamID[sid] or {}
     ownership.BySteamID[sid][ent] = itemID or ownership.BySteamID[sid][ent] or true
     ent.BW_OwnerSteamID = sid
@@ -38,11 +56,14 @@ function ownership.Track(ply, ent, itemID)
 end
 
 function ownership.Assign(ply, ent, itemID)
+    -- Prefer the CPPI setter so ownership hooks and the registry stay in sync.
+    if ent.CPPISetOwner then return ent:CPPISetOwner(ply, itemID) end
     if ent.SetPlayer then ent:SetPlayer(ply) end
     if ent.SetCPPIOwner then ent:SetCPPIOwner(ply) end
     ent.Owner = ply
     ent:SetNWEntity("Owner", ply)
     ownership.Track(ply, ent, itemID)
+    return true
 end
 
 function ownership.HasEntities(ply)
@@ -68,10 +89,16 @@ function MODULE:Init()
         local pending = {}
         for ent in pairs(objects) do pending[#pending + 1] = ent end
         if BW.Config.Ownership.RemoveOnDisconnect then
-            for _, ent in ipairs(pending) do
-                if IsValid(ent) and ownership.GetOwner(ent) == ply then ent:Remove() end
+            if BW.CPPI and BW.CPPI.IsEnabled and BW.CPPI.IsEnabled() and BW.CPPI.ScheduleCleanup then
+                -- Keep the registry intact until the timer expires so a
+                -- reconnecting player gets their props back.
+                BW.CPPI.ScheduleCleanup(ply)
+            else
+                for _, ent in ipairs(pending) do
+                    if IsValid(ent) and ownership.GetOwner(ent) == ply then ent:Remove() end
+                end
+                ownership.BySteamID[ply:SteamID64()] = nil
             end
-            ownership.BySteamID[ply:SteamID64()] = nil
         end
     end)
     hook.Add("PlayerInitialSpawn", "BW_Ownership_Restore", function(ply)
@@ -88,19 +115,19 @@ function MODULE:Init()
         for itemID, count in pairs(counts) do ply:SetNWInt("BW_ItemCount_" .. itemID, count) end
     end)
     hook.Add("PhysgunPickup", "BW_Ownership_Physgun", function(ply, ent)
-        if not ownership.CanModify(ply, ent) then return false end
+        if not ownership.CanModify(ply, ent, "Physgun") then return false end
     end)
     hook.Add("GravGunPickupAllowed", "BW_Ownership_Gravgun", function(ply, ent)
-        if not ownership.CanModify(ply, ent) then return false end
+        if not ownership.CanModify(ply, ent, "Pickup") then return false end
     end)
     hook.Add("GravGunPunt", "BW_Ownership_Gravgun", function(ply, ent)
-        if not ownership.CanModify(ply, ent) then return false end
+        if not ownership.CanModify(ply, ent, "Punt") then return false end
     end)
     hook.Add("CanPlayerUnfreeze", "BW_Ownership_Unfreeze", function(ply, ent)
-        if not ownership.CanModify(ply, ent) then return false end
+        if not ownership.CanModify(ply, ent, "Unfreeze") then return false end
     end)
     hook.Add("CanProperty", "BW_Ownership_Property", function(ply, property, ent)
-        if not ownership.CanModify(ply, ent) then return false end
+        if not ownership.CanModify(ply, ent, "Property") then return false end
         if property ~= "skin" and property ~= "bodygroups" then return false end
     end)
     hook.Add("CanDrive", "BW_Ownership_Drive", function() return false end)

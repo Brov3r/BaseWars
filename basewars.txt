@@ -9,7 +9,7 @@
 
     "author_name"       "Brov3r"
     "author_email"      ""
-    "website"           ""
+    "website"           https://github.com/Brov3r/BaseWars""
 
     "icon"              ""
     "info"              "Build a base, defend it, and raid your opponents."
